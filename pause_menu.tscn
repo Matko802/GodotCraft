@@ -1,0 +1,110 @@
+[gd_scene load_steps=2 format=3 uid="uid://c8drrrhvlktib"]
+
+[ext_resource type="Script" uid="uid://chjwurv6x8u8h" path="res://pause_menu.gd" id="1_hdmo1"]
+
+[node name="PauseMenu" type="Control"]
+process_mode = 3
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_hdmo1")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.5)
+
+[node name="CenterContainer" type="CenterContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="MenuPanel" type="PanelContainer" parent="CenterContainer"]
+custom_minimum_size = Vector2(400, 0)
+layout_mode = 2
+
+[node name="MenuMargin" type="MarginContainer" parent="CenterContainer/MenuPanel"]
+layout_mode = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="CenterContainer/MenuPanel/MenuMargin"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer"]
+layout_mode = 2
+text = "PAUSED"
+horizontal_alignment = 1
+
+[node name="MainContent" type="VBoxContainer" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer"]
+layout_mode = 2
+
+[node name="ResumeButton" type="Button" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/MainContent"]
+layout_mode = 2
+text = "Resume"
+
+[node name="SettingsButton" type="Button" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/MainContent"]
+layout_mode = 2
+text = "Settings"
+
+[node name="QuitButton" type="Button" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/MainContent"]
+layout_mode = 2
+text = "Quit to Title"
+
+[node name="SettingsContent" type="VBoxContainer" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer"]
+visible = false
+layout_mode = 2
+
+[node name="SettingsLabel" type="Label" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent"]
+layout_mode = 2
+text = "Settings"
+horizontal_alignment = 1
+
+[node name="SettingsHBox" type="HBoxContainer" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent"]
+layout_mode = 2
+
+[node name="RenderDistanceLabelUI" type="Label" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/SettingsHBox"]
+custom_minimum_size = Vector2(200, 0)
+layout_mode = 2
+text = "Render Distance: 4"
+
+[node name="RenderDistanceSliderUI" type="HSlider" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/SettingsHBox"]
+custom_minimum_size = Vector2(150, 0)
+layout_mode = 2
+min_value = 2.0
+max_value = 16.0
+value = 4.0
+
+[node name="FullscreenCheckBoxUI" type="CheckBox" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/SettingsHBox"]
+layout_mode = 2
+text = "Borderless Fullscreen"
+
+[node name="BackButtonUI" type="Button" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent"]
+layout_mode = 2
+text = "Back"
+
+[node name="HBoxFOV" type="HBoxContainer" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent"]
+layout_mode = 2
+
+[node name="FOVLabelUI" type="Label" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/HBoxFOV"]
+custom_minimum_size = Vector2(100, 0)
+layout_mode = 2
+text = "FOV: 75"
+
+[node name="FOVSliderUI" type="HSlider" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/HBoxFOV"]
+custom_minimum_size = Vector2(150, 0)
+layout_mode = 2
+min_value = 30.0
+max_value = 110.0
+value = 30.0
+
+[node name="HeartsContainer" type="HBoxContainer" parent="."]
+layout_mode = 0

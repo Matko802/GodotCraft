@@ -1,0 +1,14 @@
+[gd_scene load_steps=2 format=3 uid="uid://ta8bnvapkayn"]
+
+[ext_resource type="Script" uid="uid://bany0qk62kng" path="res://debug_menu.gd" id="1_u3ugm"]
+
+[node name="DebugMenu" type="Control"]
+layout_mode = 3
+anchors_preset = 0
+script = ExtResource("1_u3ugm")
+
+[node name="MarginContainer" type="MarginContainer" parent="."]
+layout_mode = 0
+
+[node name="Label" type="Label" parent="MarginContainer"]
+layout_mode = 2

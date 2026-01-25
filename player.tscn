@@ -1,0 +1,97 @@
+[gd_scene load_steps=14 format=3 uid="uid://ojwlgihwqr3w"]
+
+[ext_resource type="Script" uid="uid://1mdo6tyjtkx7" path="res://player.gd" id="1_4flbx"]
+[ext_resource type="PackedScene" uid="uid://crro41sc8pku" path="res://models/player/slim/slimhand.gltf" id="2_n7ghd"]
+[ext_resource type="Shader" uid="uid://b0p63epox2xsk" path="res://invert.gdshader" id="2_onrkg"]
+[ext_resource type="Texture2D" uid="uid://ce0usibj68ye" path="res://textures/crosshair.png" id="3_i3pqv"]
+[ext_resource type="PackedScene" uid="uid://dqagynrcnir30" path="res://models/player/wide/widehand.gltf" id="3_nvl01"]
+[ext_resource type="PackedScene" uid="uid://chcgtng4i5l71" path="res://inventory_ui.tscn" id="4_2hs0m"]
+[ext_resource type="Script" uid="uid://cdsxgjns8uys7" path="res://inventory.gd" id="4_hqtel"]
+[ext_resource type="PackedScene" uid="uid://c8drrrhvlktib" path="res://pause_menu.tscn" id="5_1jxqw"]
+[ext_resource type="PackedScene" uid="uid://b7vfq3ku62p3m" path="res://chat_ui.tscn" id="5_dw050"]
+[ext_resource type="PackedScene" uid="uid://ta8bnvapkayn" path="res://debug_menu.tscn" id="7_n7ghd"]
+[ext_resource type="PackedScene" uid="uid://dxvt2ug1ktjt0" path="res://models/player/wide/model.gltf" id="9_b26j0"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_dw050"]
+radius = 0.16699219
+height = 1.78125
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_onrkg"]
+shader = ExtResource("2_onrkg")
+
+[node name="Player" type="CharacterBody3D"]
+script = ExtResource("1_4flbx")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.109375, 0)
+shape = SubResource("CapsuleShape3D_dw050")
+debug_color = Color(0.9930344, 0, 0.25015664, 0.41960785)
+
+[node name="Shaders" type="Node" parent="."]
+
+[node name="HUD" type="CanvasLayer" parent="."]
+
+[node name="CrosshairContainer" type="CenterContainer" parent="HUD"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+
+[node name="CrosshairTexture" type="TextureRect" parent="HUD/CrosshairContainer"]
+texture_filter = 1
+material = SubResource("ShaderMaterial_onrkg")
+custom_minimum_size = Vector2(32, 32)
+layout_mode = 2
+mouse_filter = 2
+texture = ExtResource("3_i3pqv")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="InventoryUI" parent="HUD" instance=ExtResource("4_2hs0m")]
+mouse_filter = 2
+
+[node name="ChatUI" parent="HUD" instance=ExtResource("5_dw050")]
+
+[node name="DebugMenu" parent="HUD" instance=ExtResource("7_n7ghd")]
+
+[node name="Inventory" type="Node" parent="."]
+script = ExtResource("4_hqtel")
+
+[node name="PauseLayer" type="CanvasLayer" parent="."]
+layer = 10
+
+[node name="PauseMenu" parent="PauseLayer" instance=ExtResource("5_1jxqw")]
+
+[node name="PlayerModel" parent="." instance=ExtResource("9_b26j0")]
+transform = Transform3D(0.9, 0, 0, 0, 0.9, 0, 0, 0, 0.9, 0, -0.9912943, 0)
+
+[node name="ViewModelAnimationPlayer" type="AnimationPlayer" parent="."]
+
+[node name="TPHeldItemRoot" type="Node3D" parent="."]
+
+[node name="TPHeldItemMesh" type="MeshInstance3D" parent="TPHeldItemRoot"]
+transform = Transform3D(0.7071067, 0, 0.70710677, 0, 1, 0, -0.70710677, 0, 0.7071067, 0.3448208, -0.12444234, -0.2553643)
+
+[node name="SpringArm3D" type="SpringArm3D" parent="."]
+spring_length = 4.0
+margin = 0.15
+
+[node name="Camera3D" type="Camera3D" parent="SpringArm3D"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.7397363, 0)
+
+[node name="RayCast3D" type="RayCast3D" parent="SpringArm3D/Camera3D"]
+target_position = Vector3(0, 0, -5)
+
+[node name="ViewModelArm" type="Node3D" parent="SpringArm3D/Camera3D"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.008673191, 0, 0)
+
+[node name="SlimHandModel" parent="SpringArm3D/Camera3D/ViewModelArm" instance=ExtResource("2_n7ghd")]
+transform = Transform3D(0.9021536, 0.30435053, -0.30576137, 0.12372339, -0.86149156, -0.49246833, -0.41329378, 0.40645215, -0.81485295, 0.29611862, 0.42191756, -1.4686121)
+
+[node name="HeldItemRoot" type="Node3D" parent="SpringArm3D/Camera3D/ViewModelArm"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.8705916, -0.21652508, -1.3352511)
+
+[node name="HeldItemMesh" type="MeshInstance3D" parent="SpringArm3D/Camera3D/ViewModelArm/HeldItemRoot"]
+
+[node name="WideHandModel" parent="SpringArm3D/Camera3D/ViewModelArm" instance=ExtResource("3_nvl01")]
+transform = Transform3D(0.9021536, 0.30435053, -0.30576137, 0.12372339, -0.86149156, -0.49246833, -0.41329378, 0.40645215, -0.81485295, 0.29611862, 0.42191756, -1.4686121)

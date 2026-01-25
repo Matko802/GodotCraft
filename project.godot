@@ -1,0 +1,54 @@
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
+
+config_version=5
+
+[application]
+
+config/name="GodotCraft"
+run/main_scene="res://main_menu.tscn"
+config/features=PackedStringArray("4.5", "GL Compatibility")
+config/icon="res://icon.svg"
+
+[autoload]
+
+GameState="*res://game_state.gd"
+
+[display]
+
+window/size/viewport_width=1152.0
+window/size/viewport_height=648.0
+window/stretch/aspect="ignore"
+
+[editor_plugins]
+
+enabled=PackedStringArray()
+
+[input]
+
+move_left="{\"deadzone\": 0.5, \"events\": [{\"resource_type\": \"InputEventKey\", \"physical_keycode\": 65}]}"
+move_right="{\"deadzone\":0.5,\"events\":[{\"resource_type\":\"InputEventKey\",\"physical_keycode\":68}]}"
+move_forward="{\"deadzone\":0.5,\"events\":[{\"resource_type\":\"InputEventKey\",\"physical_keycode\":87}]}"
+move_back="{\"deadzone\":0.5,\"events\":[{\"resource_type\":\"InputEventKey\",\"physical_keycode\":83}]}"
+click_left="{\"deadzone\": 0.5, \"events\": [{\"device\": -1, \"button_index\": 1, \"pressure\": 0.0, \"pressed\": true, \"class_name\": \"InputEventMouseButton\"}]}"
+click_right="{\"deadzone\": 0.5, \"events\": [{\"device\": -1, \"button_index\": 2, \"pressure\": 0.0, \"pressed\": true, \"class_name\": \"InputEventMouseButton\"}]}"
+inventory="{\"deadzone\": 0.5, \"events\": [{\"resource_type\": \"InputEventKey\", \"physical_keycode\": 69}]}"
+
+[plugins]
+
+ai_assistant_hub/llm_api="gemini_api"
+ai_assistant_hub/preferences/thinking_target=0
+ai_assistant_hub/preferences/skip_greeting=false
+ai_assistant_hub/preferences/always_scroll_to_bottom=false
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+textures/vram_compression/import_s3tc_bptc=true
+textures/vram_compression/import_etc2_astc=true

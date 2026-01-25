@@ -1,0 +1,229 @@
+[gd_scene load_steps=2 format=3 uid="uid://2e70cch2asa7"]
+
+[ext_resource type="Script" uid="uid://dw8wj37x8sum5" path="res://main_menu.gd" id="1_06t4h"]
+
+[node name="MainMenu" type="Control"]
+process_mode = 3
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_06t4h")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.1, 0.1, 0.1, 1)
+
+[node name="MainScreen" type="CenterContainer" parent="."]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="MenuPanel" type="PanelContainer" parent="MainScreen"]
+custom_minimum_size = Vector2(300, 0)
+layout_mode = 2
+
+[node name="MenuMargin" type="MarginContainer" parent="MainScreen/MenuPanel"]
+layout_mode = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="MainScreen/MenuPanel/MenuMargin"]
+layout_mode = 2
+
+[node name="Title" type="Label" parent="MainScreen/MenuPanel/MenuMargin/VBoxContainer"]
+layout_mode = 2
+text = "GODOT CRAFT"
+horizontal_alignment = 1
+
+[node name="PlayButton" type="Button" parent="MainScreen/MenuPanel/MenuMargin/VBoxContainer"]
+layout_mode = 2
+text = "Play"
+
+[node name="SettingsButton" type="Button" parent="MainScreen/MenuPanel/MenuMargin/VBoxContainer"]
+layout_mode = 2
+text = "Settings"
+
+[node name="QuitButton" type="Button" parent="MainScreen/MenuPanel/MenuMargin/VBoxContainer"]
+layout_mode = 2
+text = "Quit"
+
+[node name="HSeparator" type="HSeparator" parent="MainScreen/MenuPanel/MenuMargin/VBoxContainer"]
+layout_mode = 2
+
+[node name="PlayScreen" type="CenterContainer" parent="."]
+visible = false
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="PanelContainer" type="PanelContainer" parent="PlayScreen"]
+custom_minimum_size = Vector2(800, 500)
+layout_mode = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="PlayScreen/PanelContainer"]
+layout_mode = 2
+
+[node name="TabContainer" type="TabContainer" parent="PlayScreen/PanelContainer/VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+current_tab = 0
+
+[node name="CreateWorld" type="VBoxContainer" parent="PlayScreen/PanelContainer/VBoxContainer/TabContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+metadata/_tab_index = 0
+
+[node name="NameInputUI" type="LineEdit" parent="PlayScreen/PanelContainer/VBoxContainer/TabContainer/CreateWorld"]
+layout_mode = 2
+placeholder_text = "World Name"
+
+[node name="SeedInputUI" type="LineEdit" parent="PlayScreen/PanelContainer/VBoxContainer/TabContainer/CreateWorld"]
+layout_mode = 2
+placeholder_text = "Seed (Optional)"
+
+[node name="CreateButtonUI" type="Button" parent="PlayScreen/PanelContainer/VBoxContainer/TabContainer/CreateWorld"]
+layout_mode = 2
+text = "Create World"
+
+[node name="LoadWorld" type="HBoxContainer" parent="PlayScreen/PanelContainer/VBoxContainer/TabContainer"]
+visible = false
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+metadata/_tab_index = 1
+
+[node name="SaveListUI" type="ItemList" parent="PlayScreen/PanelContainer/VBoxContainer/TabContainer/LoadWorld"]
+custom_minimum_size = Vector2(300, 400)
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="PreviewPanel" type="VBoxContainer" parent="PlayScreen/PanelContainer/VBoxContainer/TabContainer/LoadWorld"]
+custom_minimum_size = Vector2(300, 0)
+layout_mode = 2
+
+[node name="ThumbnailUI" type="TextureRect" parent="PlayScreen/PanelContainer/VBoxContainer/TabContainer/LoadWorld/PreviewPanel"]
+custom_minimum_size = Vector2(280, 160)
+layout_mode = 2
+expand_mode = 1
+stretch_mode = 6
+
+[node name="WorldInfoLabel" type="Label" parent="PlayScreen/PanelContainer/VBoxContainer/TabContainer/LoadWorld/PreviewPanel"]
+layout_mode = 2
+text = "Select a world"
+
+[node name="HBoxContainer" type="HBoxContainer" parent="PlayScreen/PanelContainer/VBoxContainer/TabContainer/LoadWorld/PreviewPanel"]
+layout_mode = 2
+
+[node name="LoadButtonUI" type="Button" parent="PlayScreen/PanelContainer/VBoxContainer/TabContainer/LoadWorld/PreviewPanel/HBoxContainer"]
+layout_mode = 2
+text = "Load Selected"
+
+[node name="DeleteButtonUI" type="Button" parent="PlayScreen/PanelContainer/VBoxContainer/TabContainer/LoadWorld/PreviewPanel/HBoxContainer"]
+layout_mode = 2
+text = "Delete"
+
+[node name="PlayBackButton" type="Button" parent="PlayScreen/PanelContainer/VBoxContainer"]
+layout_mode = 2
+text = "Back"
+
+[node name="SettingsScreen" type="CenterContainer" parent="."]
+visible = false
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="PanelContainer2" type="PanelContainer" parent="SettingsScreen"]
+custom_minimum_size = Vector2(500, 0)
+layout_mode = 2
+
+[node name="SettingsMargin" type="MarginContainer" parent="SettingsScreen/PanelContainer2"]
+layout_mode = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="SettingsScreen/PanelContainer2/SettingsMargin"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer"]
+layout_mode = 2
+text = "Settings"
+horizontal_alignment = 1
+
+[node name="HBoxContainer" type="HBoxContainer" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer"]
+layout_mode = 2
+
+[node name="RenderDistanceLabelUI" type="Label" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/HBoxContainer"]
+custom_minimum_size = Vector2(250, 0)
+layout_mode = 2
+text = "Render Distance: 4"
+
+[node name="RenderDistanceSliderUI" type="HSlider" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/HBoxContainer"]
+custom_minimum_size = Vector2(200, 0)
+layout_mode = 2
+min_value = 2.0
+max_value = 16.0
+value = 4.0
+
+[node name="HBoxFOV" type="HBoxContainer" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer"]
+layout_mode = 2
+
+[node name="FOVLabelUI" type="Label" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/HBoxFOV"]
+custom_minimum_size = Vector2(120, 0)
+layout_mode = 2
+text = "FOV: 75"
+
+[node name="FOVSliderUI" type="HSlider" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/HBoxFOV"]
+custom_minimum_size = Vector2(200, 0)
+layout_mode = 2
+min_value = 30.0
+max_value = 110.0
+value = 30.0
+
+[node name="FullscreenCheckBoxUI" type="CheckBox" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer"]
+layout_mode = 2
+text = "Borderless Fullscreen"
+
+[node name="SettingsBackButtonUI" type="Button" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer"]
+layout_mode = 2
+text = "Back"
+
+[node name="UsernameHBox" type="HBoxContainer" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer"]
+layout_mode = 2
+
+[node name="UsernameLabel" type="Label" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/UsernameHBox"]
+layout_mode = 2
+text = "Username: 	"
+
+[node name="UsernameInputUI" type="LineEdit" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/UsernameHBox"]
+layout_mode = 2
+placeholder_text = "Enter your username"
+
+[node name="SlimModelCheckBoxUI" type="CheckBox" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer"]
+layout_mode = 2
+text = "Slim Model Proportions"
+
+[node name="TextureHBox" type="HBoxContainer" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer"]
+layout_mode = 2
+
+[node name="TextureLabel" type="Label" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/TextureHBox"]
+layout_mode = 2
+text = "Skin Path: 	"
+
+[node name="CustomTextureInputUI" type="LineEdit" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/TextureHBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "res://... or C:/..."
+
+[node name="VersionLabel" type="Label" parent="."]
+layout_mode = 0
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -93.0
+offset_top = -23.0
+offset_right = -10.0
+offset_bottom = -10.0
+text = "build 0.0.8.0"

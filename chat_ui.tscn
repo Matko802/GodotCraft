@@ -1,0 +1,31 @@
+[gd_scene load_steps=2 format=3 uid="uid://b7vfq3ku62p3m"]
+
+[ext_resource type="Script" uid="uid://d3dpxl75ujdps" path="res://chat.gd" id="1_hixvo"]
+
+[node name="ChatUI" type="PanelContainer"]
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_top = -300.0
+offset_right = 400.0
+script = ExtResource("1_hixvo")
+
+[node name="MarginContainer" type="MarginContainer" parent="."]
+layout_mode = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="MarginContainer"]
+layout_mode = 2
+
+[node name="ChatDisplay" type="RichTextLabel" parent="MarginContainer/VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+bbcode_enabled = true
+
+[node name="SuggestionsPanel" type="PanelContainer" parent="MarginContainer/VBoxContainer"]
+layout_mode = 2
+
+[node name="SuggestionsList" type="VBoxContainer" parent="MarginContainer/VBoxContainer/SuggestionsPanel"]
+layout_mode = 2
+
+[node name="ChatInput" type="LineEdit" parent="MarginContainer/VBoxContainer"]
+layout_mode = 2

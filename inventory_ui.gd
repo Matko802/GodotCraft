@@ -1,0 +1,306 @@
+extends Control
+
+@onready var hotbar_container = $HotbarPanel/HotbarContainer
+@onready var main_inventory_panel = $MainInventoryPanel
+@onready var selection_outline = $SelectionOutline
+@onready var floating_item_ui = $FloatingItem
+@onready var hearts_container = $HeartsContainer
+
+var slot_scene = preload("res://inventory_slot.tscn")
+var inventory_ref = null
+var selected_slot = 0
+var holding_item = null # { "type": int, "count": int }
+var main_inventory_grid = GridContainer.new()
+
+var block_textures = {
+	0: preload("res://textures/stone.png"),
+	1: preload("res://textures/dirt.png"),
+	2: preload("res://textures/grass_top.png"),
+	3: preload("res://textures/Sand.png"),
+	4: preload("res://textures/bedrock.png"),
+	5: preload("res://textures/oak_wood_side.png"),
+	6: preload("res://textures/leaves.png")
+}
+
+var heart_full = preload("res://textures/hearts/heart_full.png")
+var heart_half = preload("res://textures/hearts/heart_half.png")
+
+func _ready():
+	main_inventory_panel.add_child(main_inventory_grid)
+	main_inventory_grid.columns = 9
+	main_inventory_panel.visible = false
+	
+	# Style selection outline
+	selection_outline.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	selection_outline.custom_minimum_size = Vector2(52, 52)
+	selection_outline.z_index = 5
+	selection_outline.top_level = true # Ensure it stays on top of containers
+	
+	# Hearts container styling
+	hearts_container.custom_minimum_size = Vector2(180, 18)
+	hearts_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hearts_container.top_level = true
+	
+	var outline_style = StyleBoxFlat.new()
+	outline_style.draw_center = false
+	outline_style.border_width_left = 3
+	outline_style.border_width_top = 3
+	outline_style.border_width_right = 3
+	outline_style.border_width_bottom = 3
+	outline_style.border_color = Color(1, 1, 1, 1) # White outline
+	selection_outline.add_theme_stylebox_override("panel", outline_style)
+	
+	# Style floating item
+	floating_item_ui.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	floating_item_ui.get_node("Icon").expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	floating_item_ui.get_node("Icon").stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	floating_item_ui.get_node("Icon").custom_minimum_size = Vector2(40, 40)
+	floating_item_ui.get_node("Icon").texture_filter = Control.TEXTURE_FILTER_NEAREST
+	floating_item_ui.z_index = 100
+	floating_item_ui.top_level = true # Ensure it's not clipped by parents
+	
+	# Style the panels
+	var style = StyleBoxFlat.new()
+	style.bg_color = Color(0.15, 0.15, 0.15, 0.9)
+	style.border_width_left = 2
+	style.border_width_top = 2
+	style.border_width_right = 2
+	style.border_width_bottom = 2
+	style.border_color = Color(0.3, 0.3, 0.3)
+	main_inventory_panel.add_theme_stylebox_override("panel", style)
+	
+	var hotbar_style = StyleBoxFlat.new()
+	hotbar_style.bg_color = Color(0.1, 0.1, 0.1, 0.7)
+	$HotbarPanel.add_theme_stylebox_override("panel", hotbar_style)
+	$HotbarPanel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	
+	# Fix for resolution changes
+	resized.connect(_update_selection_outline)
+	resized.connect(_update_hearts_position)
+	var state = get_node_or_null("/root/GameState")
+	if state:
+		state.settings_changed.connect(_update_selection_outline)
+		state.settings_changed.connect(_update_hearts_position)
+
+func _process(_delta):
+	if holding_item:
+		floating_item_ui.global_position = get_global_mouse_position() - Vector2(20, 20)
+
+func setup(player):
+	inventory_ref = player.inventory
+	if not inventory_ref.inventory_changed.is_connected(update_ui):
+		inventory_ref.inventory_changed.connect(update_ui)
+	
+	if player.has_signal("health_changed") and not player.health_changed.is_connected(update_health):
+		player.health_changed.connect(update_health)
+	
+	# Clear existing if any
+	for child in hotbar_container.get_children(): child.queue_free()
+	for child in main_inventory_grid.get_children(): child.queue_free()
+	
+	# Create Hotbar slots
+	for i in range(inventory_ref.HOTBAR_SIZE):
+		var slot = slot_scene.instantiate()
+		hotbar_container.add_child(slot)
+		slot.custom_minimum_size = Vector2(48, 48)
+		slot.slot_index = i
+		slot.is_hotbar_slot = true
+		slot.slot_clicked.connect(_on_slot_clicked)
+		slot.mouse_filter = Control.MOUSE_FILTER_PASS # Allow children (ClickArea) to get input
+	
+	# Create Main Inventory slots
+	for i in range(inventory_ref.INVENTORY_SIZE):
+		var slot = slot_scene.instantiate()
+		main_inventory_grid.add_child(slot)
+		slot.custom_minimum_size = Vector2(48, 48)
+		slot.slot_index = i
+		slot.is_hotbar_slot = false
+		slot.slot_clicked.connect(_on_slot_clicked)
+		slot.mouse_filter = Control.MOUSE_FILTER_PASS # Allow children (ClickArea) to get input
+		
+	update_ui()
+	update_health(player.health)
+
+func update_health(health):
+	# Clear existing hearts
+	for child in hearts_container.get_children():
+		child.queue_free()
+	
+	var heart_size_val = 18
+	if hotbar_container.get_child_count() > 0:
+		heart_size_val = int(hotbar_container.get_child(0).size.x * 0.375)
+		if heart_size_val < 8: heart_size_val = 18 # Fallback if size not yet calculated
+	
+	# Minecraft has 10 hearts for 20 HP
+	for i in range(10):
+		var heart_val = health - (i * 2)
+		if heart_val <= 0:
+			continue # Or show empty heart if we had one
+		
+		var rect = TextureRect.new()
+		rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		rect.custom_minimum_size = Vector2(heart_size_val, heart_size_val)
+		rect.texture_filter = Control.TEXTURE_FILTER_NEAREST
+		
+		if heart_val >= 2:
+			rect.texture = heart_full
+		elif heart_val == 1:
+			rect.texture = heart_half
+			
+		hearts_container.add_child(rect)
+
+func _on_slot_clicked(index, is_hotbar, is_right_click):
+	print("InventoryUI: _on_slot_clicked ", index, " hotbar: ", is_hotbar)
+	if not main_inventory_panel.visible: 
+		print("InventoryUI: main panel not visible, ignoring click")
+		return 
+
+	var slot_data = inventory_ref.hotbar[index] if is_hotbar else inventory_ref.inventory[index]
+	
+	if is_right_click:
+		_handle_right_click(index, is_hotbar, slot_data)
+	else:
+		_handle_left_click(index, is_hotbar, slot_data)
+	
+	inventory_ref.inventory_changed.emit()
+
+func _handle_left_click(index, is_hotbar, slot_data):
+	if holding_item == null:
+		if slot_data != null:
+			# Pick up whole stack
+			holding_item = slot_data
+			if is_hotbar: inventory_ref.hotbar[index] = null
+			else: inventory_ref.inventory[index] = null
+	else:
+		if slot_data == null:
+			# Place whole stack
+			if is_hotbar: inventory_ref.hotbar[index] = holding_item
+			else: inventory_ref.inventory[index] = holding_item
+			holding_item = null
+		else:
+			if slot_data.type == holding_item.type:
+				# Stack
+				var add = min(holding_item.count, inventory_ref.MAX_STACK - slot_data.count)
+				slot_data.count += add
+				holding_item.count -= add
+				if holding_item.count <= 0: holding_item = null
+			else:
+				# Swap
+				var temp = slot_data
+				if is_hotbar: inventory_ref.hotbar[index] = holding_item
+				else: inventory_ref.inventory[index] = holding_item
+				holding_item = temp
+
+func _handle_right_click(index, is_hotbar, slot_data):
+	if holding_item == null:
+		if slot_data != null:
+			# Split stack: pick up half
+			var take = ceil(slot_data.count / 2.0)
+			holding_item = {"type": slot_data.type, "count": take}
+			slot_data.count -= take
+			if slot_data.count <= 0:
+				if is_hotbar: inventory_ref.hotbar[index] = null
+				else: inventory_ref.inventory[index] = null
+	else:
+		# Drop 1 item from mouse into slot
+		if slot_data == null:
+			# Place one item
+			var one_item = {"type": holding_item.type, "count": 1}
+			if is_hotbar: inventory_ref.hotbar[index] = one_item
+			else: inventory_ref.inventory[index] = one_item
+			holding_item.count -= 1
+			if holding_item.count <= 0: holding_item = null
+		elif slot_data.type == holding_item.type and slot_data.count < inventory_ref.MAX_STACK:
+			# Add one item to stack
+			slot_data.count += 1
+			holding_item.count -= 1
+			if holding_item.count <= 0: holding_item = null
+
+func update_ui():
+	if not inventory_ref: return
+	
+	# Update Hotbar
+	for i in range(inventory_ref.HOTBAR_SIZE):
+		var slot_ui = hotbar_container.get_child(i)
+		_update_slot_visual(slot_ui, inventory_ref.hotbar[i])
+		
+	# Update Main Inventory
+	for i in range(inventory_ref.INVENTORY_SIZE):
+		var slot_ui = main_inventory_grid.get_child(i)
+		_update_slot_visual(slot_ui, inventory_ref.inventory[i])
+	
+	call_deferred("_update_selection_outline")
+	call_deferred("_update_hearts_position")
+	
+	# Update Floating Item
+	if holding_item:
+		var f_label = floating_item_ui.get_node("CountLabel")
+		f_label.add_theme_font_size_override("font_size", 18)
+		f_label.add_theme_color_override("font_outline_color", Color.BLACK)
+		f_label.add_theme_constant_override("outline_size", 4)
+		
+		floating_item_ui.get_node("Icon").texture = block_textures.get(holding_item.type)
+		f_label.text = str(holding_item.count) if holding_item.count > 1 else ""
+		floating_item_ui.visible = true
+	else:
+		floating_item_ui.visible = false
+
+func _update_hearts_position():
+	if hotbar_container.get_child_count() > 0:
+		var first_slot = hotbar_container.get_child(0)
+		var offset_y = int(first_slot.size.y * 0.52)
+		if offset_y < 10: offset_y = 25 # Fallback
+		hearts_container.global_position = first_slot.global_position - Vector2(0, offset_y)
+
+func _update_selection_outline():
+	if hotbar_container.get_child_count() > selected_slot:
+		var target_slot = hotbar_container.get_child(selected_slot)
+		selection_outline.global_position = target_slot.global_position - Vector2(2, 2)
+		selection_outline.visible = true
+
+func _update_slot_visual(slot_ui, data):
+	var icon = slot_ui.get_node("Icon")
+	var label = slot_ui.get_node("CountLabel")
+	var bg = slot_ui.get_node("Background")
+	
+	icon.texture_filter = Control.TEXTURE_FILTER_NEAREST
+	
+	# Apply styling to make numbers more visible
+	label.add_theme_font_size_override("font_size", 18)
+	label.add_theme_color_override("font_outline_color", Color.BLACK)
+	label.add_theme_constant_override("outline_size", 4)
+	
+	bg.color = Color(0.0, 0.0, 0.0, 0.4)
+
+	if data:
+		icon.texture = block_textures.get(data.type)
+		icon.visible = true
+		label.text = str(data.count) if data.count > 1 else ""
+	else:
+		icon.visible = false
+		label.text = ""
+
+func set_selected(index):
+	selected_slot = index
+	update_ui()
+
+func toggle_inventory():
+	main_inventory_panel.visible = !main_inventory_panel.visible
+	
+	if main_inventory_panel.visible:
+		Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+		mouse_filter = Control.MOUSE_FILTER_STOP
+		$HotbarPanel.mouse_filter = Control.MOUSE_FILTER_STOP
+		main_inventory_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	else:
+		Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		$HotbarPanel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		main_inventory_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		if holding_item:
+			inventory_ref.add_item(holding_item.type, holding_item.count)
+			holding_item = null
+			inventory_ref.inventory_changed.emit()
+			
+	return main_inventory_panel.visible
