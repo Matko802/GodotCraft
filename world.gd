@@ -1056,6 +1056,47 @@ func _apply_chunk_mesh(cx, cz, final_results):
 		chunks_needing_rebuild.erase(c_pos)
 		create_chunk(cx, cz)
 
+# Helper functions for water simulation (MUST BE CALLED UNDER world_mutex LOCK)
+func _get_block_type_locked(pos: Vector3i) -> int:
+	var cx = floor(float(pos.x) / chunk_size)
+	var cz = floor(float(pos.z) / chunk_size)
+	var chunk = world_data.get(Vector2i(cx, cz))
+	if chunk:
+		return chunk.get(pos, -1)
+	return -1
+
+func _set_block_type_locked(pos: Vector3i, type: int):
+	var cx = floor(float(pos.x) / chunk_size)
+	var cz = floor(float(pos.z) / chunk_size)
+	var c_pos = Vector2i(cx, cz)
+	if type == -1:
+		if world_data.has(c_pos):
+			world_data[c_pos].erase(pos)
+	else:
+		if not world_data.has(c_pos):
+			world_data[c_pos] = {}
+		world_data[c_pos][pos] = type
+
+func _get_water_level_locked(pos: Vector3i) -> int:
+	var cx = floor(float(pos.x) / chunk_size)
+	var cz = floor(float(pos.z) / chunk_size)
+	var chunk = water_levels.get(Vector2i(cx, cz))
+	if chunk:
+		return chunk.get(pos, 0)
+	return 0
+
+func _set_water_level_locked(pos: Vector3i, level: int):
+	var cx = floor(float(pos.x) / chunk_size)
+	var cz = floor(float(pos.z) / chunk_size)
+	var c_pos = Vector2i(cx, cz)
+	if level <= 0:
+		if water_levels.has(c_pos):
+			water_levels[c_pos].erase(pos)
+	else:
+		if not water_levels.has(c_pos):
+			water_levels[c_pos] = {}
+		water_levels[c_pos][pos] = level
+
 func _tick_water():
 	if water_update_queue.is_empty():
 		return
@@ -1068,25 +1109,26 @@ func _tick_water():
 	
 	world_mutex.lock()
 	for pos in current_queue:
-		var current_type = world_data.get(pos, -1)
+		var current_type = _get_block_type_locked(pos)
 		
 		# Skip non-air/non-water blocks immediately
 		if current_type != -1 and current_type != BlockType.WATER and current_type != BlockType.WATER_FLOW:
 			continue
 			
-		var old_level = water_levels.get(pos, 0) if current_type == BlockType.WATER_FLOW else (8 if current_type == BlockType.WATER else 0)
+		var old_level = _get_water_level_locked(pos) if current_type == BlockType.WATER_FLOW else (8 if current_type == BlockType.WATER else 0)
 		
 		# 1. Infinite Source logic
 		if current_type == -1 or current_type == BlockType.WATER_FLOW:
 			var source_neighbors = 0
 			for dir in [Vector3i.LEFT, Vector3i.RIGHT, Vector3i.FORWARD, Vector3i.BACK]:
-				if world_data.get(pos + dir) == BlockType.WATER:
+				if _get_block_type_locked(pos + dir) == BlockType.WATER:
 					source_neighbors += 1
 			if source_neighbors >= 2:
 				var below = pos + Vector3i.DOWN
-				if world_data.has(below) and world_data[below] != BlockType.WATER and world_data[below] != BlockType.WATER_FLOW:
-					world_data[pos] = BlockType.WATER
-					water_levels[pos] = 8
+				var type_below = _get_block_type_locked(below)
+				if type_below != -1 and type_below != BlockType.WATER and type_below != BlockType.WATER_FLOW:
+					_set_block_type_locked(pos, BlockType.WATER)
+					_set_water_level_locked(pos, 8)
 					_mark_pos_dirty(pos, chunks_to_rebuild)
 					changed = true
 					# Trigger neighbors
@@ -1098,30 +1140,32 @@ func _tick_water():
 		
 		var target_level = 0
 		var above = pos + Vector3i.UP
-		var type_above = world_data.get(above, -1)
+		var type_above = _get_block_type_locked(above)
 		if type_above == BlockType.WATER or type_above == BlockType.WATER_FLOW:
-			target_level = 7 # Falling water is always max flow level
+			target_level = 8 # Falling water is max level
 		else:
 			for dir in [Vector3i.LEFT, Vector3i.RIGHT, Vector3i.FORWARD, Vector3i.BACK]:
 				var n_pos = pos + dir
-				var n_type = world_data.get(n_pos, -1)
+				var n_type = _get_block_type_locked(n_pos)
 				if n_type == BlockType.WATER or n_type == BlockType.WATER_FLOW:
-					var n_level = 8 if n_type == BlockType.WATER else water_levels.get(n_pos, 0)
+					var n_level = 8 if n_type == BlockType.WATER else _get_water_level_locked(n_pos)
 					var n_below = n_pos + Vector3i.DOWN
-					var n_is_falling = n_below.y >= 0 and not world_data.has(n_below)
+					var n_below_type = _get_block_type_locked(n_below)
+					# Only flow sideways if there's a solid block below or if it can't flow down
+					var n_is_falling = n_below.y >= 0 and (n_below_type == -1 or n_below_type == BlockType.WATER or n_below_type == BlockType.WATER_FLOW)
 					if not n_is_falling:
 						target_level = max(target_level, n_level - 1)
 
 		if target_level > 0:
 			if current_type != BlockType.WATER_FLOW or old_level != target_level:
-				world_data[pos] = BlockType.WATER_FLOW
-				water_levels[pos] = target_level
+				_set_block_type_locked(pos, BlockType.WATER_FLOW)
+				_set_water_level_locked(pos, target_level)
 				_mark_pos_dirty(pos, chunks_to_rebuild)
 				changed = true
 				for face in FACES: _schedule_water_update(pos + face.dir)
 		elif current_type == BlockType.WATER_FLOW:
-			world_data.erase(pos)
-			water_levels.erase(pos)
+			_set_block_type_locked(pos, -1)
+			_set_water_level_locked(pos, 0)
 			_mark_pos_dirty(pos, chunks_to_rebuild)
 			changed = true
 			for face in FACES: _schedule_water_update(pos + face.dir)

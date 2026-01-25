@@ -11,7 +11,7 @@ var history = []
 var history_index = -1
 var current_input_backup = ""
 
-var commands = ["/op", "/deop", "/rule", "/help", "/tp", "/gamemode", "/spawn", "/ops", "/time"]
+var commands = ["/op", "/deop", "/rule", "/help", "/tp", "/gamemode", "/spawn", "/ops", "/time", "/kill"]
 var rules_list = ["dropitems"]
 
 var fade_timer = 0.0
@@ -121,6 +121,15 @@ func _on_input_text_changed(new_text):
 			for c in commands:
 				if c.substr(1).begins_with(help_part):
 					suggested.append(c.substr(1))
+		elif cmd_part == "kill":
+			var name_part = parts[1].to_lower()
+			var players = ["self", "Player"]
+			var state = get_node_or_null("/root/GameState")
+			if state:
+				if not state.username in players: players.append(state.username)
+			for p in players:
+				if p.to_lower().begins_with(name_part):
+					suggested.append(p)
 	
 	if suggested.size() > 0:
 		for s in suggested:
@@ -286,6 +295,31 @@ func _handle_command(command_text: String, user: String, state: Node):
 			add_message("[color=yellow]The time is " + str(int(world.time)) + "[/color]")
 		else:
 			add_message("[color=red]Usage: /time <set|add|query> <value>[/color]")
+
+	elif cmd == "kill":
+		if not state.ops.has(user):
+			add_message("[color=red]You do not have permission to use this command.[/color]")
+			return
+		
+		var target_name = "self"
+		if parts.size() > 1:
+			target_name = parts[1].to_lower()
+		
+		if target_name == "self" or target_name == user.to_lower():
+			var player = get_tree().get_first_node_in_group("player")
+			if player:
+				player.health = 0
+				add_message("[color=yellow]Killed " + user + "[/color]")
+		else:
+			# In a real multiplayer setup we'd search for the player by name.
+			# For now, we only have one player.
+			if target_name == "player": # Default fallback name
+				var player = get_tree().get_first_node_in_group("player")
+				if player:
+					player.health = 0
+					add_message("[color=yellow]Killed player[/color]")
+			else:
+				add_message("[color=red]Player not found: " + target_name + "[/color]")
 
 	elif cmd == "rule":
 		if not state.ops.has(user):

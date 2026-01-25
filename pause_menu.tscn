@@ -23,9 +23,15 @@ color = Color(0, 0, 0, 0.5)
 
 [node name="CenterContainer" type="CenterContainer" parent="."]
 layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -200.0
+offset_top = -64.0
+offset_right = 200.0
+offset_bottom = 64.0
 grow_horizontal = 2
 grow_vertical = 2
 
@@ -68,43 +74,41 @@ layout_mode = 2
 text = "Settings"
 horizontal_alignment = 1
 
-[node name="SettingsHBox" type="HBoxContainer" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent"]
+[node name="HBoxFOV" type="HBoxContainer" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent"]
 layout_mode = 2
 
-[node name="RenderDistanceLabelUI" type="Label" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/SettingsHBox"]
-custom_minimum_size = Vector2(200, 0)
-layout_mode = 2
-text = "Render Distance: 4"
-
-[node name="RenderDistanceSliderUI" type="HSlider" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/SettingsHBox"]
+[node name="FOVLabelUI" type="Label" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/HBoxFOV"]
 custom_minimum_size = Vector2(150, 0)
 layout_mode = 2
-min_value = 2.0
-max_value = 16.0
-value = 4.0
+text = "FOV: 75"
 
-[node name="FullscreenCheckBoxUI" type="CheckBox" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/SettingsHBox"]
+[node name="FOVSliderUI" type="HSlider" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/HBoxFOV"]
 layout_mode = 2
-text = "Borderless Fullscreen"
+size_flags_horizontal = 3
+min_value = 30.0
+max_value = 110.0
+value = 30.0
+
+[node name="FullscreenCheckBoxUI" type="CheckBox" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent"]
+layout_mode = 2
+text = "Fullscreen"
 
 [node name="BackButtonUI" type="Button" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent"]
 layout_mode = 2
 text = "Back"
 
-[node name="HBoxFOV" type="HBoxContainer" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent"]
+[node name="HBoxRender" type="HBoxContainer" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent"]
 layout_mode = 2
 
-[node name="FOVLabelUI" type="Label" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/HBoxFOV"]
-custom_minimum_size = Vector2(100, 0)
+[node name="RenderDistanceLabelUI" type="Label" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/HBoxRender"]
 layout_mode = 2
-text = "FOV: 75"
 
-[node name="FOVSliderUI" type="HSlider" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/HBoxFOV"]
-custom_minimum_size = Vector2(150, 0)
+[node name="RenderDistanceSliderUI" type="HSlider" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/HBoxRender"]
 layout_mode = 2
-min_value = 30.0
-max_value = 110.0
-value = 30.0
+size_flags_horizontal = 3
+min_value = 2.0
+max_value = 16.0
+value = 2.0
 
 [node name="HeartsContainer" type="HBoxContainer" parent="."]
 layout_mode = 0

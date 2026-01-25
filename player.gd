@@ -113,6 +113,7 @@ var selection_box: MeshInstance3D
 
 var _was_on_floor = false
 var _fall_start_y = 0.0
+var _void_damage_timer = 0.0
 
 @onready var raycast_pivot: Node3D = null
 
@@ -155,6 +156,11 @@ func _ready():
 	
 	_update_camera_mode()
 	_apply_rotations()
+	
+	var state = get_node_or_null("/root/GameState")
+	if state:
+		state.settings_changed.connect(_on_settings_changed)
+		_on_settings_changed() # Initialize FOV
 
 var camera_pitch = 0.0
 
@@ -790,3 +796,12 @@ func _physics_process(delta):
 	_was_on_floor = is_on_floor()
 
 	move_and_slide()
+	
+	# Void Damage
+	if global_position.y < -10.0:
+		_void_damage_timer += delta
+		if _void_damage_timer >= 1.0:
+			health -= 3
+			_void_damage_timer = 0.0
+	else:
+		_void_damage_timer = 0.0

@@ -10,26 +10,26 @@ extends Control
 @onready var quit_button = $MainScreen/MenuPanel/MenuMargin/VBoxContainer/QuitButton
 
 # Play Screen Elements
-@onready var world_name_input = $PlayScreen/PanelContainer/VBoxContainer/TabContainer/CreateWorld/NameInputUI
-@onready var seed_input = $PlayScreen/PanelContainer/VBoxContainer/TabContainer/CreateWorld/SeedInputUI
-@onready var create_button = $PlayScreen/PanelContainer/VBoxContainer/TabContainer/CreateWorld/CreateButtonUI
-@onready var save_list = $PlayScreen/PanelContainer/VBoxContainer/TabContainer/LoadWorld/SaveListUI
-@onready var load_button = $PlayScreen/PanelContainer/VBoxContainer/TabContainer/LoadWorld/PreviewPanel/HBoxContainer/LoadButtonUI
-@onready var delete_button = $PlayScreen/PanelContainer/VBoxContainer/TabContainer/LoadWorld/PreviewPanel/HBoxContainer/DeleteButtonUI
-@onready var thumbnail_ui = $PlayScreen/PanelContainer/VBoxContainer/TabContainer/LoadWorld/PreviewPanel/ThumbnailUI
-@onready var info_label = $PlayScreen/PanelContainer/VBoxContainer/TabContainer/LoadWorld/PreviewPanel/WorldInfoLabel
-@onready var play_back_button = $PlayScreen/PanelContainer/VBoxContainer/PlayBackButton
+@onready var world_name_input = find_child("NameInputUI", true)
+@onready var seed_input = find_child("SeedInputUI", true)
+@onready var create_button = find_child("CreateButtonUI", true)
+@onready var save_list = find_child("SaveListUI", true)
+@onready var load_button = find_child("LoadButtonUI", true)
+@onready var delete_button = find_child("DeleteButtonUI", true)
+@onready var thumbnail_ui = find_child("ThumbnailUI", true)
+@onready var info_label = find_child("WorldInfoLabel", true)
+@onready var play_back_button = find_child("PlayBackButton", true)
 
 # Settings Screen Elements
-@onready var render_distance_slider = $SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/HBoxContainer/RenderDistanceSliderUI
-@onready var render_distance_label = $SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/HBoxContainer/RenderDistanceLabelUI
-@onready var fov_slider = $SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/HBoxFOV/FOVSliderUI
-@onready var fov_label = $SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/HBoxFOV/FOVLabelUI
-@onready var fullscreen_checkbox = $SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/FullscreenCheckBoxUI
-@onready var slim_checkbox = $SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SlimModelCheckBoxUI
-@onready var custom_texture_input = $SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/TextureHBox/CustomTextureInputUI
-@onready var username_input = $SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/UsernameHBox/UsernameInputUI
-@onready var settings_back_button = $SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsBackButtonUI
+@onready var render_distance_slider = find_child("RenderDistanceSliderUI", true)
+@onready var render_distance_label = find_child("RenderDistanceLabelUI", true)
+@onready var fov_slider = find_child("FOVSliderUI", true)
+@onready var fov_label = find_child("FOVLabelUI", true)
+@onready var fullscreen_checkbox = find_child("FullscreenCheckBoxUI", true)
+@onready var slim_checkbox = find_child("SlimModelCheckBoxUI", true)
+@onready var custom_texture_input = find_child("CustomTextureInputUI", true)
+@onready var username_input = find_child("UsernameInputUI", true)
+@onready var settings_back_button = find_child("SettingsBackButtonUI", true)
 
 var selected_save_index = -1
 

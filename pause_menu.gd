@@ -1,12 +1,12 @@
 extends Control
 
-@onready var main_content = $CenterContainer/MenuPanel/MenuMargin/VBoxContainer/MainContent
-@onready var settings_content = $CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent
-@onready var render_distance_slider = $CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/SettingsHBox/RenderDistanceSliderUI
-@onready var render_distance_label = $CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/SettingsHBox/RenderDistanceLabelUI
-@onready var fov_slider = $CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/HBoxFOV/FOVSliderUI
-@onready var fov_label = $CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/HBoxFOV/FOVLabelUI
-@onready var fullscreen_checkbox = $CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/SettingsHBox/FullscreenCheckBoxUI
+@onready var main_content = find_child("MainContent", true)
+@onready var settings_content = find_child("SettingsContent", true)
+@onready var render_distance_slider = find_child("RenderDistanceSliderUI", true)
+@onready var render_distance_label = find_child("RenderDistanceLabelUI", true)
+@onready var fov_slider = find_child("FOVSliderUI", true)
+@onready var fov_label = find_child("FOVLabelUI", true)
+@onready var fullscreen_checkbox = find_child("FullscreenCheckBoxUI", true)
 
 func _ready():
 	visible = false
