@@ -59,6 +59,8 @@ const TYPE_TO_SOUND = {
 	BlockType.LEAVES: "grass"
 }
 
+const DROPPED_ITEM_SCENE = preload("res://dropped_item.tscn")
+
 var world_data = {} # {Vector2i: {Vector3i: type}}
 var water_levels = {} # {Vector2i: {Vector3i: level}}
 var chunks = {} # {Vector2i: Node3D}
@@ -202,9 +204,6 @@ func remove_block(world_pos: Vector3i):
 	var chunk = world_data.get(c_pos)
 	if chunk and chunk.has(world_pos):
 		var type = chunk[world_pos]
-		if type == BlockType.BEDROCK:
-			world_mutex.unlock()
-			return
 		
 		spawn_break_particles(Vector3(world_pos), type)
 		play_break_sound(Vector3(world_pos), type)
@@ -416,6 +415,26 @@ func _load_world_data(data):
 			state.rules = data["rules"]
 		if data.has("ops"):
 			state.ops = data["ops"]
+		if data.has("gamemode"):
+			state.gamemode = data["gamemode"]
+	
+	if data.has("dropped_items"):
+		# Clear existing dropped items if any
+		for item in get_tree().get_nodes_in_group("dropped_items"):
+			item.queue_free()
+			
+		for d in data["dropped_items"]:
+			# Ensure we don't spawn items if they were somehow invalid
+			if d.get("type", -1) == -1: continue
+			
+			var item = DROPPED_ITEM_SCENE.instantiate()
+			item.type = d["type"]
+			item.count = d.get("count", 1)
+			add_child(item)
+			item.global_position = d["pos"]
+			item.velocity = d.get("vel", Vector3.ZERO)
+			# Prevent immediate pickup when loading
+			item.pickup_delay = 1.0 
 
 func _update_sun_rotation():
 	if not sun or not celestial_bodies: return
@@ -491,6 +510,16 @@ func save_game():
 			inv_data["hotbar"] = inv.hotbar
 			inv_data["inventory"] = inv.inventory
 
+		var dropped_items_data = []
+		for item in get_tree().get_nodes_in_group("dropped_items"):
+			if is_instance_valid(item):
+				dropped_items_data.append({
+					"type": item.type,
+					"count": item.count,
+					"pos": item.global_position,
+					"vel": item.velocity
+				})
+
 		world_mutex.lock()
 		var data = {
 			"seed": world_seed,
@@ -501,6 +530,8 @@ func save_game():
 			"inventory": inv_data,
 			"rules": state.rules.duplicate(),
 			"ops": state.ops.duplicate(),
+			"gamemode": state.gamemode,
+			"dropped_items": dropped_items_data,
 			"time": time
 		}
 		world_mutex.unlock()

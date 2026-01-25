@@ -29,17 +29,30 @@ current_tab = 0
 layout_mode = 2
 metadata/_tab_index = 0
 
+[node name="TopArea" type="HBoxContainer" parent="MainInventoryPanel/InventoryTabs/Inventory"]
+layout_mode = 2
+
+[node name="PreviewContainer" type="SubViewportContainer" parent="MainInventoryPanel/InventoryTabs/Inventory/TopArea"]
+custom_minimum_size = Vector2(150, 200)
+layout_mode = 2
+
+[node name="PreviewViewport" type="SubViewport" parent="MainInventoryPanel/InventoryTabs/Inventory/TopArea/PreviewContainer"]
+own_world_3d = true
+transparent_bg = true
+handle_input_locally = false
+render_target_update_mode = 4
+
+[node name="PreviewCamera" type="Camera3D" parent="MainInventoryPanel/InventoryTabs/Inventory/TopArea/PreviewContainer/PreviewViewport"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 2)
+
+[node name="PreviewModelRoot" type="Node3D" parent="MainInventoryPanel/InventoryTabs/Inventory/TopArea/PreviewContainer/PreviewViewport"]
+
+[node name="PreviewLight" type="DirectionalLight3D" parent="MainInventoryPanel/InventoryTabs/Inventory/TopArea/PreviewContainer/PreviewViewport"]
+transform = Transform3D(0.70710677, -0.49999997, 0.49999997, 0, 0.70710677, 0.70710677, -0.70710677, -0.49999997, 0.49999997, 0, 0, 0)
+
 [node name="InventoryGridContainer" type="GridContainer" parent="MainInventoryPanel/InventoryTabs/Inventory"]
 layout_mode = 2
 columns = 9
-
-[node name="MainHotbarGridContainer" type="GridContainer" parent="MainInventoryPanel/InventoryTabs/Inventory"]
-layout_mode = 2
-columns = 9
-
-[node name="Spacer" type="Control" parent="MainInventoryPanel/InventoryTabs/Inventory"]
-custom_minimum_size = Vector2(0, 10)
-layout_mode = 2
 
 [node name="Creative" type="VBoxContainer" parent="MainInventoryPanel/InventoryTabs"]
 visible = false
@@ -68,18 +81,15 @@ anchors_preset = 0
 mouse_filter = 2
 
 [node name="Icon" type="TextureRect" parent="FloatingItem"]
-custom_minimum_size = Vector2(48, 48)
 layout_mode = 0
 mouse_filter = 2
-expand_mode = 1
-stretch_mode = 5
 
 [node name="CountLabel" type="Label" parent="FloatingItem"]
+layout_mode = 0
+
+[node name="SelectionOutline" type="Panel" parent="."]
 layout_mode = 0
 
 [node name="HeartsContainer" type="HBoxContainer" parent="."]
 layout_mode = 0
 mouse_filter = 2
-
-[node name="SelectionOutline" type="Panel" parent="."]
-layout_mode = 0

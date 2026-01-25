@@ -7,6 +7,9 @@ var is_hotbar_slot = false
 
 func _ready():
 	$ClickArea.gui_input.connect(_on_click_area_input)
+	$ClickArea.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	if has_node("Background"):
+		$Background.visible = false
 
 func _on_click_area_input(event):
 	if event is InputEventMouseButton and event.pressed:

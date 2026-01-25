@@ -9,6 +9,14 @@ var username = "Player"
 var is_slim = false
 var custom_texture_path = ""
 
+enum GameMode { SURVIVAL, CREATIVE }
+var gamemode = GameMode.SURVIVAL:
+	set(value):
+		gamemode = value
+		gamemode_changed.emit(value)
+
+signal gamemode_changed(new_mode)
+
 # Game Rules
 var rules = {
 	"drop_items": true

@@ -10,7 +10,7 @@ script = ExtResource("1_42eed")
 [node name="Background" type="ColorRect" parent="."]
 layout_mode = 2
 mouse_filter = 2
-color = Color(0, 0, 0, 0.4)
+color = Color(0.2520276, 0.25202766, 0.25202763, 1)
 
 [node name="Icon" type="TextureRect" parent="."]
 texture_filter = 1
@@ -26,4 +26,5 @@ vertical_alignment = 2
 
 [node name="ClickArea" type="Button" parent="."]
 layout_mode = 2
+focus_mode = 0
 flat = true

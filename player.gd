@@ -3,6 +3,9 @@ extends CharacterBody3D
 const SPEED = 4.3
 const SPRINT_SPEED = 5.6
 const JUMP_VELOCITY = 8.5
+const FLY_SPEED = 10.0
+const FLY_SPRINT_SPEED = 20.0
+const FLY_ACCEL = 10.0
 const MOUSE_SENSITIVITY = 0.002
 
 @onready var camera = $SpringArm3D/Camera3D
@@ -41,12 +44,20 @@ signal health_changed(new_health)
 var max_health = 20
 var health = 20:
 	set(value):
+		var state = get_node_or_null("/root/GameState")
+		if state and state.gamemode == state.GameMode.CREATIVE:
+			# In creative, only allow health to be set to 0 (death command)
+			if value > 0:
+				return
+				
 		if value < health:
 			_play_damage_sound()
 		health = clamp(value, 0, max_health)
 		health_changed.emit(health)
 		if health <= 0:
 			_die()
+
+var is_flying = false
 
 const DAMAGE_SOUNDS = [
 	"res://textures/Sounds/damage/hit1.ogg",
@@ -115,6 +126,9 @@ var _was_on_floor = false
 var _fall_start_y = 0.0
 var _void_damage_timer = 0.0
 
+var _last_jump_press_time = -1.0
+const DOUBLE_TAP_TIME = 0.3
+
 @onready var raycast_pivot: Node3D = null
 
 func _ready():
@@ -160,7 +174,14 @@ func _ready():
 	var state = get_node_or_null("/root/GameState")
 	if state:
 		state.settings_changed.connect(_on_settings_changed)
+		state.gamemode_changed.connect(_on_gamemode_changed)
 		_on_settings_changed() # Initialize FOV
+
+func _on_gamemode_changed(_new_mode):
+	health_changed.emit(health)
+	_update_held_item_mesh()
+	if _new_mode == 0: # SURVIVAL
+		is_flying = false
 
 var camera_pitch = 0.0
 
@@ -280,8 +301,11 @@ func _setup_selection_box():
 	selection_box.mesh = st.commit()
 	var mat = StandardMaterial3D.new()
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.albedo_color = Color.BLACK
+	mat.albedo_color = Color.WHITE
 	mat.render_priority = 10
+	# No depth test allows the outline to be seen through some transparent surfaces
+	# though typically in Minecraft it's depth tested.
+	mat.no_depth_test = false 
 	selection_box.material_override = mat
 	add_child(selection_box)
 	selection_box.top_level = true
@@ -502,7 +526,7 @@ func _unhandled_input(event):
 	if chat_ui and chat_ui.is_chat_active():
 		return
 
-	if event.is_action_pressed("inventory") or (event is InputEventKey and event.pressed and event.keycode == KEY_E):
+	if (event is InputEventKey and event.pressed and event.keycode == KEY_E):
 		inventory_ui.toggle_inventory()
 		get_viewport().set_input_as_handled()
 		return
@@ -523,12 +547,25 @@ func _unhandled_input(event):
 				return
 	
 	# Debug health
-	if event is InputEventKey and event.pressed and event.keycode == KEY_H:
-		health -= 1
-		return
-	if event is InputEventKey and event.pressed and event.keycode == KEY_J:
-		health += 1
-		return
+	if event is InputEventKey and event.pressed:
+		if event.keycode == KEY_SPACE and not event.is_echo():
+			var state = get_node_or_null("/root/GameState")
+			if state and state.gamemode == state.GameMode.CREATIVE:
+				var current_time = Time.get_ticks_msec() / 1000.0
+				if current_time - _last_jump_press_time < DOUBLE_TAP_TIME:
+					is_flying = !is_flying
+					if is_flying:
+						velocity.y = 0
+					_last_jump_press_time = -1.0 # Reset
+				else:
+					_last_jump_press_time = current_time
+		
+		if event.keycode == KEY_H:
+			health -= 1
+			return
+		if event.keycode == KEY_J:
+			health += 1
+			return
 
 	# Manual item drop
 	if event is InputEventKey and event.pressed and event.keycode == KEY_Q:
@@ -599,14 +636,13 @@ func _break_block():
 		var block_pos = Vector3i(floor(pos.x), floor(pos.y), floor(pos.z))
 		var block_type = world.get_block(block_pos)
 		
-		if block_type >= 0 and block_type != 4: # Not air and not bedrock
+		var state_gm = get_node_or_null("/root/GameState")
+		var is_creative_mode = state_gm and state_gm.gamemode == state_gm.GameMode.CREATIVE
+		
+		if block_type >= 0 and (block_type != 4 or is_creative_mode): # Not air and (not bedrock or creative)
 			swing()
 			
-			var state = get_node_or_null("/root/GameState")
-			var should_drop = state.rules.get("drop_items", true) if state else true
-			
-			if should_drop:
-				inventory.spawn_dropped_item(block_type, 1, Vector3(block_pos), world)
+			inventory.spawn_dropped_item(block_type, 1, Vector3(block_pos), world)
 			
 			world.remove_block(block_pos)
 
@@ -717,21 +753,30 @@ func _physics_process(delta):
 			in_water = true
 
 	# Gravity
-	if not is_on_floor():
+	if not is_on_floor() and not is_flying:
 		if in_water:
 			velocity.y -= gravity * 0.1 * delta
 			velocity.y = max(velocity.y, -2.0) 
 		else:
 			velocity.y -= gravity * delta
 
-	# Jump / Swim
+	# Jump / Swim / Fly
 	var is_sprinting = Input.is_key_pressed(KEY_CTRL)
-	if Input.is_key_pressed(KEY_SPACE):
-		if is_on_floor():
-			velocity.y = JUMP_VELOCITY
-		elif in_water:
-			velocity.y = 6.0 
-			if not head_in_water: velocity.y = 9.0 
+
+	if is_flying:
+		var v_dir = 0.0
+		if Input.is_key_pressed(KEY_SPACE): v_dir += 1.0
+		if Input.is_key_pressed(KEY_SHIFT): v_dir -= 1.0
+		
+		var target_v_speed = v_dir * (FLY_SPRINT_SPEED if is_sprinting else FLY_SPEED)
+		velocity.y = move_toward(velocity.y, target_v_speed, delta * FLY_SPEED * 5.0)
+	else:
+		if Input.is_key_pressed(KEY_SPACE):
+			if is_on_floor():
+				velocity.y = JUMP_VELOCITY
+			elif in_water:
+				velocity.y = 6.0 
+				if not head_in_water: velocity.y = 9.0 
 
 	# Input Direction
 	var input_dir = Vector2.ZERO
@@ -743,10 +788,16 @@ func _physics_process(delta):
 	# Calculate move direction relative to player rotation
 	var move_dir = (transform.basis * Vector3(input_dir.x, 0, input_dir.y)).normalized()
 	var target_speed = SPRINT_SPEED if is_sprinting else SPEED
+	if is_flying:
+		target_speed = FLY_SPRINT_SPEED if is_sprinting else FLY_SPEED
 	
 	var horizontal_vel = Vector2(velocity.x, velocity.z)
 	
-	if in_water:
+	if is_flying:
+		var fly_accel = 60.0 if move_dir.length() > 0 else 40.0
+		var target_h_vel = Vector2(move_dir.x, move_dir.z) * target_speed
+		horizontal_vel = horizontal_vel.move_toward(target_h_vel, fly_accel * delta)
+	elif in_water:
 		var water_accel = 15.0
 		var target_h_vel = Vector2(move_dir.x, move_dir.z) * target_speed * 0.6
 		horizontal_vel = horizontal_vel.move_toward(target_h_vel, water_accel * delta)
@@ -785,8 +836,12 @@ func _physics_process(delta):
 			if fall_dist > 3.5 and not in_water: # 3 blocks safe, take damage on 4th
 				var damage = floor(fall_dist - 3.0)
 				if damage > 0:
-					_play_fall_sound(fall_dist)
-					health -= damage
+					var state_gm = get_node_or_null("/root/GameState")
+					var is_creative_mode = state_gm and state_gm.gamemode == state_gm.GameMode.CREATIVE
+					
+					if not is_creative_mode:
+						_play_fall_sound(fall_dist)
+						health -= damage
 		_fall_start_y = global_position.y
 	else:
 		# If we are moving up, reset fall start to current height
@@ -798,10 +853,14 @@ func _physics_process(delta):
 	move_and_slide()
 	
 	# Void Damage
-	if global_position.y < -10.0:
+	if global_position.y < -20.0:
 		_void_damage_timer += delta
-		if _void_damage_timer >= 1.0:
-			health -= 3
+		if _void_damage_timer >= 0.5:
+			var state_gm = get_node_or_null("/root/GameState")
+			if state_gm and state_gm.gamemode == state_gm.GameMode.CREATIVE:
+				health = 0 # Creative players die to void
+			else:
+				health -= 4
 			_void_damage_timer = 0.0
 	else:
 		_void_damage_timer = 0.0

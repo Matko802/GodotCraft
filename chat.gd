@@ -105,6 +105,11 @@ func _on_input_text_changed(new_text):
 			for r in rules_list:
 				if r.begins_with(rule_part):
 					suggested.append(r)
+		elif cmd_part == "gamemode":
+			var mode_part = parts[1].to_lower()
+			for m in ["survival", "creative"]:
+				if m.begins_with(mode_part):
+					suggested.append(m)
 		elif cmd_part == "op" or cmd_part == "deop":
 			var name_part = parts[1].to_lower()
 			# In a real game we'd get all online players
@@ -264,6 +269,24 @@ func _handle_command(command_text: String, user: String, state: Node):
 	elif cmd == "ops":
 		add_message("[color=yellow]Operators: " + ", ".join(state.ops) + "[/color]")
 			
+	elif cmd == "gamemode":
+		if not state.ops.has(user):
+			add_message("[color=red]You do not have permission to use this command.[/color]")
+			return
+		
+		if parts.size() > 1:
+			var mode = parts[1].to_lower()
+			if mode == "survival" or mode == "0":
+				state.gamemode = state.GameMode.SURVIVAL
+				add_message("[color=yellow]Set game mode to Survival Mode[/color]")
+			elif mode == "creative" or mode == "1":
+				state.gamemode = state.GameMode.CREATIVE
+				add_message("[color=yellow]Set game mode to Creative Mode[/color]")
+			else:
+				add_message("[color=red]Unknown game mode: " + mode + "[/color]")
+		else:
+			add_message("[color=red]Usage: /gamemode <survival|creative>[/color]")
+
 	elif cmd == "time":
 		if not state.ops.has(user):
 			add_message("[color=red]You do not have permission to use this command.[/color]")

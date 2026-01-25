@@ -106,6 +106,27 @@ func add_item(type, count = 1):
 			
 	return false # Full
 
+func can_add_item(type: int, count: int = 1) -> bool:
+	if type < 0: return false
+	
+	# Check for existing stacks
+	for slot in hotbar:
+		if slot and slot.type == type and slot.count < MAX_STACK:
+			count -= (MAX_STACK - slot.count)
+			if count <= 0: return true
+	for slot in inventory:
+		if slot and slot.type == type and slot.count < MAX_STACK:
+			count -= (MAX_STACK - slot.count)
+			if count <= 0: return true
+			
+	# Check for empty slots
+	for slot in hotbar:
+		if slot == null: return true
+	for slot in inventory:
+		if slot == null: return true
+		
+	return false
+
 func pick_block(type: int, current_selected_slot: int):
 	# 1. Check if it's already in the hotbar
 	for i in range(HOTBAR_SIZE):

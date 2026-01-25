@@ -24,6 +24,7 @@ var block_textures = {
 @onready var mesh_instance = $MeshInstance3D
 
 func _ready():
+	add_to_group("dropped_items")
 	# Construct a perfect mini-block using the same logic as the world
 	var mesh = ArrayMesh.new()
 	var st = SurfaceTool.new()
@@ -89,30 +90,39 @@ func _process(delta):
 	if pickup_delay > 0:
 		pickup_delay -= delta
 
-	if not resting:
-		# Simple gravity and collision
-		velocity.y -= gravity * delta
+	# Gravity and Movement
+	if not resting or being_picked_up:
+		if not resting:
+			velocity.y -= gravity * delta
+		else:
+			# Slight upward force to help it slide over small bumps while being pulled
+			velocity.y = move_toward(velocity.y, 0, delta * 10.0)
 		
 		var space_state = get_world_3d().direct_space_state
 		var next_pos = global_position + velocity * delta
 		var query = PhysicsRayQueryParameters3D.create(global_position, next_pos)
+		# Only collide with world (Layer 1)
+		query.collision_mask = 1
 		var result = space_state.intersect_ray(query)
 		
 		if result:
 			if result.normal.y > 0.5: # Floor collision
-				global_position = result.position + Vector3(0, 0.2, 0)
-				velocity = Vector3.ZERO
+				global_position.y = result.position.y + 0.25
+				velocity.y = 0
 				resting = true
+				# Add friction to horizontal velocity
+				velocity.x *= 0.8
+				velocity.z *= 0.8
 			else: # Wall collision
-				# Slide out of the wall and lose horizontal momentum, but keep falling
 				global_position = result.position + result.normal * 0.1
-				velocity.x = 0
-				velocity.z = 0
+				velocity = velocity.bounce(result.normal) * 0.3
 		else:
 			global_position = next_pos
+			if velocity.y < -0.1: # If falling
+				resting = false
 	
 	# Floating/Bobbing and Spin animation
-	var bob = sin(time_passed * 3.0) * 0.1
+	var bob = 0.2 + sin(time_passed * 3.0) * 0.1
 	mesh_instance.position.y = bob
 	mesh_instance.rotate_y(delta * 2.0)
 	
@@ -120,25 +130,38 @@ func _process(delta):
 	if pickup_delay <= 0:
 		var players = get_tree().get_nodes_in_group("player")
 		for player in players:
-			var dist = global_position.distance_to(player.global_position)
+			# Only attract if player has space
+			if not player.inventory.can_add_item(type, count):
+				continue
+				
+			var target_pos = player.global_position + Vector3(0, 0.5, 0)
+			var dist = global_position.distance_to(target_pos)
 			
-			if dist < 0.6:
+			if dist < 0.3: # Collection threshold
 				if player.inventory.add_item(type, count):
 					_play_pickup_sound()
 					queue_free()
 					return
-			elif dist < 3.5: # Increased attraction range
+			elif dist < 3.5: # Attraction range
 				being_picked_up = true
 				target_player = player
-				# Stronger attraction effect
-				var dir = (player.global_position + Vector3(0, 0.5, 0) - global_position).normalized()
-				velocity = velocity.lerp(dir * 10.0, delta * 8.0)
-				global_position += velocity * delta
+				
+				# Magnetic pull
+				var dir = (target_pos - global_position).normalized()
+				var pull_speed = 12.0
+				# Get faster as it gets closer to snap into the 0.3m zone
+				if dist < 1.0:
+					pull_speed = 18.0
+					
+				velocity = velocity.lerp(dir * pull_speed, delta * 10.0)
 				
 				# Shrink animation when close
-				var s = clamp(dist - 0.5, 0.1, 1.0)
+				var s = clamp(dist * 2.0, 0.1, 1.0)
 				mesh_instance.scale = Vector3.ONE * s
 				return # Only attract to one player
+		
+		# If no player is nearby, we are no longer being picked up
+		being_picked_up = false
 
 func _play_pickup_sound():
 	var audio = AudioStreamPlayer.new()
