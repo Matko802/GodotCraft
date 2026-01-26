@@ -91,6 +91,15 @@ func _process(delta):
 		pickup_delay -= delta
 
 	# Gravity and Movement
+	var world = get_tree().get_first_node_in_group("world")
+	
+	# If resting, check if there is still a block below
+	if resting and world:
+		var below_pos = Vector3i(floor(global_position.x), floor(global_position.y - 0.1), floor(global_position.z))
+		var block_below = world.get_block(below_pos)
+		if block_below == -1 or block_below == 7 or block_below == 8: # Air or Water
+			resting = false
+
 	if not resting or being_picked_up:
 		if not resting:
 			velocity.y -= gravity * delta
@@ -98,28 +107,49 @@ func _process(delta):
 			# Slight upward force to help it slide over small bumps while being pulled
 			velocity.y = move_toward(velocity.y, 0, delta * 10.0)
 		
+		# Safety check: if we are inside a solid block, push us up
+		if world:
+			var current_block_pos = Vector3i(floor(global_position.x), floor(global_position.y), floor(global_position.z))
+			var block_type = world.get_block(current_block_pos)
+			if block_type >= 0 and block_type != 7 and block_type != 8: # Not air or water
+				global_position.y = ceil(global_position.y) + 0.1
+				velocity.y = 0
+				resting = true
+
 		var space_state = get_world_3d().direct_space_state
 		var next_pos = global_position + velocity * delta
-		var query = PhysicsRayQueryParameters3D.create(global_position, next_pos)
+		# Start raycast slightly above current position to detect blocks we might be slightly inside of
+		var ray_start = global_position + Vector3(0, 0.2, 0)
+		var query = PhysicsRayQueryParameters3D.create(ray_start, next_pos)
 		# Only collide with world (Layer 1)
 		query.collision_mask = 1
 		var result = space_state.intersect_ray(query)
 		
 		if result:
 			if result.normal.y > 0.5: # Floor collision
-				global_position.y = result.position.y + 0.25
+				global_position.y = result.position.y + 0.05
 				velocity.y = 0
 				resting = true
 				# Add friction to horizontal velocity
-				velocity.x *= 0.8
-				velocity.z *= 0.8
+				velocity.x *= 0.5
+				velocity.z *= 0.5
 			else: # Wall collision
 				global_position = result.position + result.normal * 0.1
 				velocity = velocity.bounce(result.normal) * 0.3
 		else:
 			global_position = next_pos
-			if velocity.y < -0.1: # If falling
+			# If we are falling and not currently marked as resting
+			if velocity.y < -0.1:
 				resting = false
+	
+	# Secondary fall-through prevention using world data directly
+	if not resting and world:
+		var feet_pos = Vector3i(floor(global_position.x), floor(global_position.y), floor(global_position.z))
+		var feet_block = world.get_block(feet_pos)
+		if feet_block >= 0 and feet_block != 7 and feet_block != 8:
+			global_position.y = ceil(global_position.y) + 0.05
+			velocity.y = 0
+			resting = true
 	
 	# Floating/Bobbing and Spin animation
 	var bob = 0.2 + sin(time_passed * 3.0) * 0.1

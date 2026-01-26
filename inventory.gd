@@ -57,7 +57,8 @@ func spawn_dropped_item(type: int, count: int, pos: Vector3, world: Node, custom
 	item.type = type
 	item.count = count
 	world.add_child(item)
-	item.global_position = pos + Vector3(0, 0.5, 0)
+	# Center the item in the block (0.5 on all axes)
+	item.global_position = pos + Vector3(0.5, 0.5, 0.5)
 	
 	if custom_vel != Vector3.ZERO:
 		item.velocity = custom_vel

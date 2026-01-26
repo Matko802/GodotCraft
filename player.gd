@@ -301,7 +301,7 @@ func _setup_selection_box():
 	selection_box.mesh = st.commit()
 	var mat = StandardMaterial3D.new()
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.albedo_color = Color.WHITE
+	mat.albedo_color = Color.BLACK
 	mat.render_priority = 10
 	# No depth test allows the outline to be seen through some transparent surfaces
 	# though typically in Minecraft it's depth tested.

@@ -78,6 +78,10 @@ func setup(player):
 	if player.has_signal("health_changed") and not player.health_changed.is_connected(update_health):
 		player.health_changed.connect(update_health)
 	
+	var state = get_node_or_null("/root/GameState")
+	if state and not state.gamemode_changed.is_connected(_on_gamemode_changed):
+		state.gamemode_changed.connect(_on_gamemode_changed)
+	
 	# Clear existing if any
 	for child in hotbar_container.get_children(): child.queue_free()
 	for child in main_inventory_grid.get_children(): child.queue_free()
@@ -118,9 +122,15 @@ func setup(player):
 	update_ui()
 	update_health(player.health)
 
+func _on_gamemode_changed(_new_mode):
+	var player = get_tree().get_first_node_in_group("player")
+	if player:
+		update_health(player.health)
+		_update_hearts_position()
+
 func update_health(health):
 	var state = get_node_or_null("/root/GameState")
-	if state and state.gamemode == state.GameMode.CREATIVE:
+	if (state and state.gamemode == state.GameMode.CREATIVE) or (main_inventory_panel and main_inventory_panel.visible):
 		hearts_container.visible = false
 		return
 	else:
@@ -130,16 +140,21 @@ func update_health(health):
 	for child in hearts_container.get_children():
 		child.queue_free()
 	
+	# Wait for children to be freed before potentially rebuilding
+	# Actually queue_free is enough, we just add new ones.
+	
 	var heart_size_val = 18
 	if hotbar_container.get_child_count() > 0:
 		heart_size_val = int(hotbar_container.get_child(0).size.x * 0.375)
-		if heart_size_val < 8: heart_size_val = 18 # Fallback if size not yet calculated
+		if heart_size_val < 8: heart_size_val = 18 
 	
-	# Minecraft has 10 hearts for 20 HP
 	for i in range(10):
 		var heart_val = health - (i * 2)
 		if heart_val <= 0:
-			continue # Or show empty heart if we had one
+			# Still add a placeholder or empty heart if we had one, 
+			# but here we just stop or show nothing. 
+			# To fix "not unhiding" we MUST ensure we add nodes if health > 0.
+			continue 
 		
 		var rect = TextureRect.new()
 		rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -153,6 +168,9 @@ func update_health(health):
 			rect.texture = heart_half
 			
 		hearts_container.add_child(rect)
+	
+	# Force position update
+	_update_hearts_position()
 
 func _on_slot_clicked(index, is_hotbar, is_right_click):
 	if not main_inventory_panel.visible: 
@@ -261,6 +279,10 @@ func _update_hearts_position():
 		hearts_container.global_position = first_slot.global_position - Vector2(0, offset_y)
 
 func _update_selection_outline():
+	if main_inventory_panel and main_inventory_panel.visible:
+		selection_outline.visible = false
+		return
+		
 	if hotbar_container.get_child_count() > selected_slot:
 		var target_slot = hotbar_container.get_child(selected_slot)
 		selection_outline.global_position = target_slot.global_position - Vector2(2, 2)
@@ -332,12 +354,21 @@ func toggle_inventory():
 		$HotbarPanel.mouse_filter = Control.MOUSE_FILTER_STOP
 		main_inventory_panel.mouse_filter = Control.MOUSE_FILTER_STOP
 		$HotbarPanel.visible = false # Hide bottom hotbar when inventory is open
+		selection_outline.visible = false
+		hearts_container.visible = false
 	else:
 		Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
 		$HotbarPanel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		main_inventory_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		$HotbarPanel.visible = true
+		
+		# Force refresh to show selector and hearts
+		update_ui()
+		var player = get_tree().get_first_node_in_group("player")
+		if player:
+			update_health(player.health)
+			
 		if holding_item:
 			inventory_ref.add_item(holding_item.type, holding_item.count)
 			holding_item = null
