@@ -12,7 +12,6 @@ extends Control
 @onready var shadows_label = find_child("ShadowsLabelUI", true) as Label
 @onready var msaa_button = find_child("MSAAOptionButtonUI", true) as OptionButton
 @onready var slim_checkbox = find_child("SlimModelCheckBoxUI", true) as CheckBox
-@onready var custom_texture_input = find_child("CustomTextureInputUI", true) as LineEdit
 @onready var browse_texture_button = find_child("BrowseTextureButtonUI", true) as Button
 @onready var username_input = find_child("UsernameInputUI", true) as LineEdit
 
@@ -38,7 +37,6 @@ func _ready():
 	msaa_button.item_selected.connect(_on_msaa_selected)
 	
 	slim_checkbox.toggled.connect(_on_slim_toggled)
-	custom_texture_input.text_changed.connect(_on_custom_texture_changed)
 	browse_texture_button.pressed.connect(_on_browse_texture_pressed)
 	username_input.text_changed.connect(_on_username_changed)
 	
@@ -98,7 +96,6 @@ func _refresh_ui_from_state():
 	_update_shadows_label(state.shadow_quality)
 	msaa_button.selected = state.msaa
 	slim_checkbox.set_pressed_no_signal(state.is_slim)
-	custom_texture_input.text = state.custom_texture_path
 	username_input.text = state.username
 
 func _on_external_settings_changed():
@@ -138,12 +135,6 @@ func _on_slim_toggled(toggled_on):
 	var state = get_node_or_null("/root/GameState")
 	if state:
 		state.is_slim = toggled_on
-		state.save_settings()
-
-func _on_custom_texture_changed(new_path):
-	var state = get_node_or_null("/root/GameState")
-	if state:
-		state.custom_texture_path = new_path
 		state.save_settings()
 
 func _on_username_changed(new_username):
@@ -195,14 +186,17 @@ func _on_web_file_selected(args):
 			if err != OK: err = img.load_webp_from_buffer(packed_bytes)
 			if err != OK: err = img.load_jpg_from_buffer(packed_bytes)
 			if err == OK:
-				var target_path = "user://custom_skin.png"
-				img.save_png(target_path)
 				var state = get_node_or_null("/root/GameState")
+				var target_path = "user://skins/custom_skin.png"
+				if state:
+					target_path = state.SKINS_DIR + "custom_skin.png"
+				
+				img.save_png(target_path)
 				if state:
 					state.custom_texture_path = target_path
 					state.save_settings()
-					if custom_texture_input:
-						custom_texture_input.text = target_path
+					if username_input: # Reusing for path feedback if needed
+						print("Web skin loaded to skins folder")
 		)
 		reader.onload = _web_reader_callback
 		reader.readAsArrayBuffer(file)
@@ -214,16 +208,18 @@ func _on_file_selected(status: bool, selected_paths: PackedStringArray, _selecte
 	var path = selected_paths[0]
 	var img = Image.load_from_file(path)
 	if img:
+		var state = get_node_or_null("/root/GameState")
 		var ext = path.get_extension()
-		var target_path = "user://custom_skin." + ext
+		var target_path = "user://skins/custom_skin." + ext
+		if state:
+			target_path = state.SKINS_DIR + "custom_skin." + ext
+			
 		var err = img.save_png(target_path) if ext.to_lower() == "png" else img.save_webp(target_path)
 		
 		if err == OK:
-			var state = get_node_or_null("/root/GameState")
 			if state:
 				state.custom_texture_path = target_path
 				state.save_settings()
-				custom_texture_input.text = target_path
 		else:
 			print("Error saving custom skin: ", err)
 

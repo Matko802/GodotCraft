@@ -178,10 +178,6 @@ layout_mode = 2
 layout_mode = 2
 text = "Custom Texture Path: 	"
 
-[node name="CustomTextureInputUI" type="LineEdit" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/ScrollContainer/SettingsList/CustomTextureHBox" unique_id=1352664753]
-layout_mode = 2
-size_flags_horizontal = 3
-
 [node name="BrowseTextureButtonUI" type="Button" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/ScrollContainer/SettingsList/CustomTextureHBox" unique_id=62986115]
 layout_mode = 2
 text = "Browse"

@@ -63,11 +63,14 @@ signal settings_changed
 
 const SETTINGS_PATH = "user://settings.cfg"
 const SAVES_DIR = "user://saves/"
+const SKINS_DIR = "user://skins/"
 
 func _ready():
 	load_settings()
 	if not DirAccess.dir_exists_absolute(SAVES_DIR):
 		DirAccess.make_dir_absolute(SAVES_DIR)
+	if not DirAccess.dir_exists_absolute(SKINS_DIR):
+		DirAccess.make_dir_absolute(SKINS_DIR)
 
 func _input(event):
 	if event is InputEventKey and event.pressed and event.keycode == KEY_F11:
