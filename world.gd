@@ -1080,14 +1080,24 @@ func generate_chunk_data(cx, cz):
 			# Simple Tree Generation
 			if not is_desert and not is_water_area and height > SEA_LEVEL + 3:
 				tree_rng.seed = world_seed_hash + hash(Vector2i(world_x, world_z))
-				if tree_rng.randf() < 0.02:
+				if tree_rng.randf() < 0.007:
 					var tree_height = tree_rng.randi_range(4, 6)
 					for ty in range(tree_height):
 						chunk_blocks[Vector3i(world_x, height + 1 + ty, world_z)] = BlockType.WOOD
 					
-					for lx in range(-2, 3):
-						for lz in range(-2, 3):
-							for ly in range(2):
+					# Improved leaf pattern
+					for ly in range(-2, 3): # 5 layers of leaves (up to 2 above trunk)
+						var radius = 2 if ly < 0 else 1
+						if ly == 2: radius = 0 # Pointy top
+						
+						for lx in range(-radius, radius + 1):
+							for lz in range(-radius, radius + 1):
+								# Avoid corners for a rounder look
+								if radius == 2 and abs(lx) == 2 and abs(lz) == 2:
+									continue
+								if radius == 1 and ly == 1 and abs(lx) == 1 and abs(lz) == 1:
+									if tree_rng.randf() < 0.5: continue
+								
 								var l_pos = Vector3i(world_x + lx, height + tree_height + ly, world_z + lz)
 								if floor(float(l_pos.x) / chunk_size) == cx and floor(float(l_pos.z) / chunk_size) == cz:
 									if not chunk_blocks.has(l_pos):

@@ -36,12 +36,17 @@ const MOUSE_SENSITIVITY = 0.002
 @onready var left_arm = $PlayerModel/Waist/"Left Arm2"
 @onready var right_leg = $"PlayerModel/Right Leg2"
 @onready var left_leg = $"PlayerModel/Left Leg2"
+var _waist_node: Node3D = null
 
 var walk_time = 0.0
 var idle_time = 0.0
 var is_swinging = false
 var swing_progress = 0.0
 const SWING_SPEED = 4.0
+
+var sneak_progress = 0.0
+const SNEAK_CAM_OFFSET = -0.25
+const SNEAK_TRANSITION_SPEED = 12.0
 
 var _hand_light_ref: OmniLight3D = null
 var _viewmodel_light_ref: OmniLight3D = null
@@ -268,6 +273,8 @@ func _setup_player_model():
 	
 	var new_head = player_model.find_child("Head2", true)
 	if not new_head: new_head = player_model.find_child("Head", true)
+	
+	_waist_node = player_model.find_child("Waist", true)
 	
 	if new_head and head_node != new_head:
 		head_node = new_head
@@ -607,13 +614,34 @@ func _process(delta):
 	_update_swing(delta)
 	_update_selection_box()
 	_update_mining(delta)
+	_update_sneak(delta)
 	_animate_walk(delta)
 	_update_view_model(delta)
+	_apply_rotations()
 
 	# Synchronize view model camera
 	if view_model_camera:
 		view_model_camera.global_transform = camera.global_transform
 		view_model_camera.fov = 85 # Increased FOV to make the hand look smaller and further away
+
+func _update_sneak(delta):
+	var is_sneaking = Input.is_action_pressed("sneak") and not is_flying
+	var target_sneak = 1.0 if is_sneaking else 0.0
+	sneak_progress = move_toward(sneak_progress, target_sneak, delta * SNEAK_TRANSITION_SPEED)
+	
+	# Adjust spring arm height smoothly instead of camera
+	# This ensures the vertical offset is always relative to the player's up axis,
+	# not the camera's local rotated axis.
+	var base_spring_y = 0.65
+	spring_arm.position.y = base_spring_y + (sneak_progress * SNEAK_CAM_OFFSET)
+	
+	# Adjust third person model scale/position for sneaking
+	if player_model:
+		# Shift model down
+		player_model.position.y = -0.99 + (sneak_progress * -0.05)
+		if _waist_node:
+			# Tilt the body backward (negative value)
+			_waist_node.rotation.x = sneak_progress * -0.4
 
 	# Fallback safety: If we are stuck in a block, reset fall damage to prevent unfair death
 	if get_last_slide_collision() != null and not is_on_floor() and velocity.length() < 1.0:
@@ -635,8 +663,20 @@ func _update_mining(delta):
 	var is_creative = state and state.gamemode == state.GameMode.CREATIVE
 	
 	if Input.is_action_pressed("attack") and raycast.is_colliding() and not is_creative:
-		var pos = raycast.get_collision_point() - raycast.get_collision_normal() * 0.1
-		var block_pos = Vector3i(floor(pos.x), floor(pos.y), floor(pos.z))
+		var hit_point = raycast.get_collision_point()
+		var hit_normal = raycast.get_collision_normal()
+		
+		var abs_normal = hit_normal.abs()
+		var break_dir = Vector3i.ZERO
+		if abs_normal.x > abs_normal.y and abs_normal.x > abs_normal.z:
+			break_dir.x = 1 if hit_normal.x > 0 else -1
+		elif abs_normal.y > abs_normal.x and abs_normal.y > abs_normal.z:
+			break_dir.y = 1 if hit_normal.y > 0 else -1
+		else:
+			break_dir.z = 1 if hit_normal.z > 0 else -1
+			
+		var block_center = hit_point - Vector3(break_dir) * 0.5
+		var block_pos = Vector3i(floor(block_center.x), floor(block_center.y), floor(block_center.z))
 		var type = world.get_block(block_pos)
 		
 		# Type 7 and 8 are water
@@ -744,13 +784,21 @@ func _animate_walk(delta):
 			swing_rot = -s * 0.5
 			swing_pos = Vector3(0, s * 0.1, -s * 0.2)
 		
-		view_model_arm.position.x = lerp(view_model_arm.position.x, view_model_base_pos.x + swing_pos.x, delta * 10.0)
-		view_model_arm.position.y = lerp(view_model_arm.position.y, view_model_base_pos.y + swing_pos.y, delta * 10.0)
+		var bob_intensity = clamp(horizontal_speed / SPRINT_SPEED, 0.0, 1.0)
+		if not is_on_floor(): bob_intensity = 0.0
+		
+		var bob_x = sin(walk_time * 0.5) * 0.02 * bob_intensity
+		var bob_y = abs(cos(walk_time)) * 0.02 * bob_intensity
+		
+		view_model_arm.position.x = lerp(view_model_arm.position.x, view_model_base_pos.x + swing_pos.x + bob_x, delta * 10.0)
+		view_model_arm.position.y = lerp(view_model_arm.position.y, view_model_base_pos.y + swing_pos.y - bob_y, delta * 10.0)
 		view_model_arm.position.z = lerp(view_model_arm.position.z, view_model_base_pos.z + swing_pos.z, delta * 10.0)
 		view_model_arm.rotation.x = lerp(view_model_arm.rotation.x, view_model_base_rot.x + swing_rot, delta * 15.0)
 
 	if horizontal_speed > 0.1:
-		var angle = sin(walk_time) * 0.6
+		var angle = sin(walk_time) * (0.6 + sneak_progress * -0.2)
+		var bend = sneak_progress * -0.3
+		var arm_bend = sneak_progress * 0.2
 		
 		right_leg.rotation = Vector3(-angle, 0, 0)
 		left_leg.rotation = Vector3(angle, 0, 0)
@@ -758,35 +806,37 @@ func _animate_walk(delta):
 		# 3rd person arm swing
 		if is_swinging:
 			var s = sin(swing_progress * PI)
-			right_arm.rotation = Vector3(-s * -0.8, 0, 0)
+			right_arm.rotation = Vector3(-s * -0.8 + arm_bend, 0, 0)
 		else:
 			if is_holding:
-				right_arm.rotation = Vector3(0.3 + (angle * 0.3), 0, 0)
+				right_arm.rotation = Vector3(0.3 + (angle * 0.3) + arm_bend, 0, 0)
 			else:
-				right_arm.rotation = Vector3(angle, 0, 0)
+				right_arm.rotation = Vector3(angle + arm_bend, 0, 0)
 			
-		left_arm.rotation = Vector3(-angle, 0, 0)
+		left_arm.rotation = Vector3(-angle + arm_bend, 0, 0)
 	else:
 		# Idle / Neutral pose (applies on floor and in air)
 		var breathe = sin(idle_time * 1.5) * 0.05
 		var sway = cos(idle_time * 0.7) * 0.02
+		var bend = sneak_progress * -0.3
+		var arm_bend = sneak_progress * 0.2
 		
 		for part in [right_leg, left_leg]:
 			if part:
-				part.rotation.x = move_toward(part.rotation.x, 0, delta * 5.0)
+				part.rotation.x = lerp(part.rotation.x, 0.0, delta * 5.0)
 				part.rotation.y = move_toward(part.rotation.y, 0, delta * 5.0)
 				part.rotation.z = move_toward(part.rotation.z, 0, delta * 5.0)
 		
 		if left_arm:
-			left_arm.rotation.x = lerp(left_arm.rotation.x, breathe, delta * 5.0)
+			left_arm.rotation.x = lerp(left_arm.rotation.x, breathe + arm_bend, delta * 5.0)
 			left_arm.rotation.z = lerp(left_arm.rotation.z, -abs(sway), delta * 5.0)
 		
 		if is_swinging:
 			var s = sin(swing_progress * PI)
-			right_arm.rotation = Vector3(-s * -0.8, 0, 0)
+			right_arm.rotation = Vector3(-s * -0.8 + arm_bend, 0, 0)
 		elif right_arm:
 			var target_x = 0.3 + breathe if is_holding else breathe
-			right_arm.rotation.x = lerp(right_arm.rotation.x, target_x, delta * 5.0)
+			right_arm.rotation.x = lerp(right_arm.rotation.x, target_x + arm_bend, delta * 5.0)
 			right_arm.rotation.z = lerp(right_arm.rotation.z, abs(sway), delta * 5.0)
 
 func _update_selection_box():
@@ -903,7 +953,9 @@ func _unhandled_input(event):
 
 func _apply_rotations():
 	if head_node:
-		head_node.rotation.x = camera_pitch
+		# Compensate for body tilt when sneaking (waist is -0.4, so we add 0.4)
+		var head_sneak_offset = sneak_progress * 0.4
+		head_node.rotation.x = camera_pitch + head_sneak_offset
 	
 	if raycast_pivot:
 		raycast_pivot.rotation.x = camera_pitch
@@ -920,8 +972,21 @@ func _apply_rotations():
 func _pick_block():
 	if raycast.is_colliding():
 		var collider = raycast.get_collider()
-		var pos = raycast.get_collision_point() - raycast.get_collision_normal() * 0.5
-		var block_pos = Vector3i(floor(pos.x), floor(pos.y), floor(pos.z))
+		
+		var hit_point = raycast.get_collision_point()
+		var hit_normal = raycast.get_collision_normal()
+		
+		var abs_normal = hit_normal.abs()
+		var pick_dir = Vector3i.ZERO
+		if abs_normal.x > abs_normal.y and abs_normal.x > abs_normal.z:
+			pick_dir.x = 1 if hit_normal.x > 0 else -1
+		elif abs_normal.y > abs_normal.x and abs_normal.y > abs_normal.z:
+			pick_dir.y = 1 if hit_normal.y > 0 else -1
+		else:
+			pick_dir.z = 1 if hit_normal.z > 0 else -1
+			
+		var block_center = hit_point - Vector3(pick_dir) * 0.5
+		var block_pos = Vector3i(floor(block_center.x), floor(block_center.y), floor(block_center.z))
 		
 		if collider is StaticBody3D and collider.collision_layer == 4:
 			block_pos = Vector3i(floor(collider.global_position.x), floor(collider.global_position.y), floor(collider.global_position.z))
@@ -983,9 +1048,22 @@ func _break_block():
 			var pos = raycast.get_collision_point() - raycast.get_collision_normal() * 0.1
 			block_pos = Vector3i(floor(pos.x), floor(pos.y), floor(pos.z))
 		else:
-			# Standard block
-			var pos = raycast.get_collision_point() - raycast.get_collision_normal() * 0.1
-			block_pos = Vector3i(floor(pos.x), floor(pos.y), floor(pos.z))
+			# Standard block - use robust center finding
+			var hit_point = raycast.get_collision_point()
+			var hit_normal = raycast.get_collision_normal()
+			
+			# Snap normal
+			var abs_normal = hit_normal.abs()
+			var break_dir = Vector3i.ZERO
+			if abs_normal.x > abs_normal.y and abs_normal.x > abs_normal.z:
+				break_dir.x = 1 if hit_normal.x > 0 else -1
+			elif abs_normal.y > abs_normal.x and abs_normal.y > abs_normal.z:
+				break_dir.y = 1 if hit_normal.y > 0 else -1
+			else:
+				break_dir.z = 1 if hit_normal.z > 0 else -1
+
+			var block_center = hit_point - Vector3(break_dir) * 0.5
+			block_pos = Vector3i(floor(block_center.x), floor(block_center.y), floor(block_center.z))
 		
 		var block_type = world.get_block(block_pos)
 		
@@ -1009,8 +1087,24 @@ func _place_block():
 		if collider is StaticBody3D and collider.collision_layer == 4:
 			return
 			
-		var pos = raycast.get_collision_point() + raycast.get_collision_normal() * 0.5
-		var block_pos = Vector3i(floor(pos.x), floor(pos.y), floor(pos.z))
+		# Improve accuracy: Find the exact block we hit first
+		var hit_point = raycast.get_collision_point()
+		var hit_normal = raycast.get_collision_normal()
+		
+		# Snap normal to grid axes to prevent diagonal placement on edges
+		var abs_normal = hit_normal.abs()
+		var place_dir = Vector3i.ZERO
+		if abs_normal.x > abs_normal.y and abs_normal.x > abs_normal.z:
+			place_dir.x = 1 if hit_normal.x > 0 else -1
+		elif abs_normal.y > abs_normal.x and abs_normal.y > abs_normal.z:
+			place_dir.y = 1 if hit_normal.y > 0 else -1
+		else:
+			place_dir.z = 1 if hit_normal.z > 0 else -1
+		
+		# Calculate target position by moving to the center of the new block
+		# Using 0.5 offset ensures we land in the correct grid cell even with floating point errors
+		var block_center = hit_point + Vector3(place_dir) * 0.5
+		var block_pos = Vector3i(floor(block_center.x), floor(block_center.y), floor(block_center.z))
 		
 		# Prevent placing inside a torch that we might have missed hitting directly
 		if world.get_block(block_pos) == 9:
@@ -1051,7 +1145,8 @@ func _update_camera_mode():
 	# Eye height relative to player root
 	# Feet are at -0.99 (PlayerModel position)
 	# Center of head is roughly 0.6 - 0.7
-	var base_pos = Vector3(0, 0.65, 0) 
+	var base_spring_y = 0.65
+	var base_pos = Vector3(0, base_spring_y + (sneak_progress * SNEAK_CAM_OFFSET), 0) 
 	
 	spring_arm.position = base_pos
 	camera.scale = Vector3.ONE # Ensure no distortion
@@ -1135,7 +1230,8 @@ func _physics_process(delta):
 			velocity.y -= gravity * delta
 
 	# Jump / Swim / Fly
-	var is_sprinting = Input.is_key_pressed(KEY_CTRL)
+	var is_sprinting = Input.is_key_pressed(KEY_CTRL) and not Input.is_action_pressed("sneak")
+	var is_sneaking = Input.is_action_pressed("sneak") and not is_flying
 
 	if is_flying:
 		var v_dir = 0.0
@@ -1162,6 +1258,8 @@ func _physics_process(delta):
 	var target_speed = SPRINT_SPEED if is_sprinting else SPEED
 	if is_flying:
 		target_speed = FLY_SPRINT_SPEED if is_sprinting else FLY_SPEED
+	elif is_sneaking:
+		target_speed = SPEED * 0.5
 	
 	var move_dir = (transform.basis * Vector3(input_dir.x, 0, input_dir.y)).normalized()
 	
@@ -1200,6 +1298,27 @@ func _physics_process(delta):
 
 	velocity.x = horizontal_vel.x
 	velocity.z = horizontal_vel.y
+
+	# Minecraft-style Crouching/Sneaking: Prevent walking off ledges
+	# Only active when sneaking on ground (not flying, not in air)
+	if Input.is_action_pressed("sneak") and not is_flying and (is_on_floor() or _was_on_floor):
+		var check_motion = Vector3(velocity.x, 0, velocity.z) * delta
+		var next_pos = global_position + check_motion
+		
+		# If the next position is not safe (center over void)
+		if not _is_safe_at(next_pos):
+			# Try to salvage movement on single axes
+			var safe_x = _is_safe_at(global_position + Vector3(check_motion.x, 0, 0))
+			var safe_z = _is_safe_at(global_position + Vector3(0, 0, check_motion.z))
+			
+			if safe_x:
+				velocity.z = 0
+			elif safe_z:
+				velocity.x = 0
+			else:
+				# Neither axis is safe, stop completely
+				velocity.x = 0
+				velocity.z = 0
 
 	# Minecraft-style Fall Damage (Distance based)
 	var fall_damage_reset = is_on_floor() or in_water or (get_last_slide_collision() != null and velocity.length() < 0.5)
@@ -1282,3 +1401,27 @@ func _handle_stuck(_delta):
 		else:
 			global_position.z = bc.z + sign(diff.z) * (0.5 + player_radius + 0.01)
 			velocity.z = 0
+
+func _is_safe_at(pos: Vector3) -> bool:
+	if not world: return true
+	
+	# Helper to check if a specific position is over a solid block
+	var is_solid = func(p: Vector3) -> bool:
+		var check_pos = p + Vector3(0, -1.1, 0)
+		var block_pos = Vector3i(floor(check_pos.x), floor(check_pos.y), floor(check_pos.z))
+		var type = world.get_block(block_pos)
+		# Safe if standing on a solid block (not Air -1, not Water 7/8, not Torch 9)
+		return type >= 0 and type != 7 and type != 8 and type != 9
+
+	# If center is safe, we are good
+	if is_solid.call(pos): return true
+	
+	# Allow overhang up to 0.2 units
+	# If any point within 0.2 of the center is on solid ground, allow it.
+	var offset = 0.2
+	if is_solid.call(pos + Vector3(offset, 0, 0)): return true
+	if is_solid.call(pos + Vector3(-offset, 0, 0)): return true
+	if is_solid.call(pos + Vector3(0, 0, offset)): return true
+	if is_solid.call(pos + Vector3(0, 0, -offset)): return true
+	
+	return false
