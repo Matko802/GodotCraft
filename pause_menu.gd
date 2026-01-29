@@ -153,8 +153,59 @@ func _on_username_changed(new_username):
 		state.save_settings()
 
 func _on_browse_texture_pressed():
-	var filters = ["*.png", "*.jpg", "*.jpeg", "*.tga", "*.bmp", "*.webp"]
-	DisplayServer.file_dialog_show("Open Player Texture", "", "", false, DisplayServer.FILE_DIALOG_MODE_OPEN_FILE, filters, _on_file_selected)
+	print("Browse texture pressed")
+	if OS.has_feature("web"):
+		_open_web_file_dialog()
+	elif DisplayServer.has_method("file_dialog_show"):
+		var filters = ["*.png", "*.jpg", "*.jpeg", "*.tga", "*.bmp", "*.webp"]
+		DisplayServer.file_dialog_show("Open Player Texture", "", "", false, DisplayServer.FILE_DIALOG_MODE_OPEN_FILE, filters, _on_file_selected)
+
+var _web_file_callback = null
+var _web_reader_callback = null
+
+func _open_web_file_dialog():
+	if not JavaScriptBridge: return
+	var document = JavaScriptBridge.get_interface("document")
+	var input = document.createElement("input")
+	input.type = "file"
+	input.accept = ".png,.jpg,.jpeg,.webp"
+	input.style.display = "none"
+	document.body.appendChild(input)
+	
+	_web_file_callback = JavaScriptBridge.create_callback(func(args):
+		_on_web_file_selected(args)
+		document.body.removeChild(input)
+	)
+	input.onchange = _web_file_callback
+	input.click()
+
+func _on_web_file_selected(args):
+	var event = args[0]
+	var files = event.target.files
+	if files.length > 0:
+		var file = files[0]
+		var reader = JavaScriptBridge.create_object("FileReader")
+		_web_reader_callback = JavaScriptBridge.create_callback(func(reader_args):
+			var result = reader_args[0].target.result
+			var bytes = JavaScriptBridge.get_interface("Uint8Array").new(result)
+			var packed_bytes = PackedByteArray()
+			for i in range(bytes.length): packed_bytes.append(bytes[i])
+			var img = Image.new()
+			var err = img.load_png_from_buffer(packed_bytes)
+			if err != OK: err = img.load_webp_from_buffer(packed_bytes)
+			if err != OK: err = img.load_jpg_from_buffer(packed_bytes)
+			if err == OK:
+				var target_path = "user://custom_skin.png"
+				img.save_png(target_path)
+				var state = get_node_or_null("/root/GameState")
+				if state:
+					state.custom_texture_path = target_path
+					state.save_settings()
+					if custom_texture_input:
+						custom_texture_input.text = target_path
+		)
+		reader.onload = _web_reader_callback
+		reader.readAsArrayBuffer(file)
 
 func _on_file_selected(status: bool, selected_paths: PackedStringArray, _selected_filter_index: int):
 	if not status or selected_paths.is_empty():
