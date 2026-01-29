@@ -248,37 +248,29 @@ func spawn_break_particles(pos: Vector3, type: int):
 	if ResourceLoader.exists(tex_path):
 		texture = load(tex_path)
 	
-	# Spawn 8 debris chunks
-	for i in range(8):
+	# Reduced to 4 particles for better performance
+	for i in range(4):
 		var debris = MeshInstance3D.new()
-		# Use QuadMesh for 2D look
 		var quad = QuadMesh.new()
-		quad.size = Vector2(0.125, 0.125)
+		quad.size = Vector2(0.15, 0.15)
 		debris.mesh = quad
 		
 		var mat = StandardMaterial3D.new()
 		mat.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
-		mat.roughness = 1.0
 		mat.albedo_texture = texture
 		mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
 		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED # Always face camera
+		mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
 		
-		# Random UV offset to make chunks look different
-		mat.uv1_offset = Vector3(randf(), randf(), 0)
+		mat.uv1_offset = Vector3(randf() * 0.75, randf() * 0.75, 0)
 		mat.uv1_scale = Vector3(0.25, 0.25, 0.25)
 		
 		debris.material_override = mat
 		debris.set_script(DEBRIS_SCRIPT)
-		
 		add_child(debris)
 		
-		# Start near the center of the block but spread out
-		var offset = Vector3(randf()-0.5, randf()-0.5, randf()-0.5) * 0.5
-		debris.global_position = pos + Vector3(0.5, 0.5, 0.5) + offset
-		
-		# Pop up slightly and fall
-		debris.velocity = Vector3(randf() - 0.5, randf() * 2.0, randf() - 0.5) * 2.0
+		debris.global_position = pos + Vector3(0.5, 0.5, 0.5) + Vector3(randf()-0.5, randf()-0.5, randf()-0.5) * 0.3
+		debris.velocity = Vector3(randf() - 0.5, randf() * 1.5 + 1.0, randf() - 0.5) * 2.5
 
 func play_break_sound(pos: Vector3, type: int):
 	var category = TYPE_TO_SOUND.get(type, "stone")
@@ -340,9 +332,8 @@ func _update_chunk_at(world_pos: Vector3i):
 	if local_z == chunk_size - 1: _rebuild_chunk(Vector2i(cx, cz + 1))
 
 func _rebuild_chunk(c_pos: Vector2i):
-	# Don't queue-free immediately to avoid flickering while building
-	# Instead, we will replace the node once the new one is ready
-	create_chunk(c_pos.x, c_pos.y)
+	# High priority rebuild for player actions
+	create_chunk(c_pos.x, c_pos.y, true)
 
 func _enter_tree():
 	_setup_materials()
@@ -939,11 +930,11 @@ func _process_generation_queue(_player_pos):
 	var current_data_gen_limit = data_gen_limit
 	
 	if is_loading:
-		current_gen_speed = 16 # Faster meshing during load
-		current_data_gen_limit = 24
+		current_gen_speed = 16 
+		current_data_gen_limit = 32 # Increased for faster loading
 	else:
-		current_gen_speed = 1
-		current_data_gen_limit = 2
+		current_gen_speed = 2 # Slightly faster in-game
+		current_data_gen_limit = 4
 
 	# 1. Process Data Generation
 	if not chunks_data_to_generate.is_empty() and active_data_tasks < current_data_gen_limit:
@@ -954,30 +945,22 @@ func _process_generation_queue(_player_pos):
 			active_data_tasks += 1
 			WorkerThreadPool.add_task(func(): 
 				var world = instance_from_id(self_id)
-				if world:
+				if is_instance_valid(world):
 					world.generate_chunk_data(c_pos.x, c_pos.y)
 					world.call_deferred("_on_data_task_finished")
-			)
+			, false) # Low priority for background data gen
 
 	# 2. Process Mesh Generation
 	if not chunks_to_generate.is_empty():
 		var processed = 0
-		var remaining = []
-		
-		# Throttle in-game generation to avoid lag
-		if not is_loading:
-			mesh_throttle_timer += get_process_delta_time()
-			if mesh_throttle_timer < 0.1: # Only try to mesh 10 chunks per second max
-				return
-			mesh_throttle_timer = 0.0
-
-		var effective_gen_speed = current_gen_speed if is_loading else 1
-		
-		# During loading, we process in bulk. In game, we check a few per frame.
-		var check_limit = 100 if is_loading else 10
+		var check_limit = 200 if is_loading else 20
 		var checked = 0
 		
-		while not chunks_to_generate.is_empty() and processed < effective_gen_speed and checked < check_limit:
+		# Use a local copy of chunks_to_generate to avoid modifying it during iteration if needed, 
+		# but here we use a temporary list to hold chunks that aren't ready yet.
+		var not_ready = []
+		
+		while not chunks_to_generate.is_empty() and processed < current_gen_speed and checked < check_limit:
 			var c_pos = chunks_to_generate.pop_front()
 			checked += 1
 			
@@ -985,28 +968,25 @@ func _process_generation_queue(_player_pos):
 				chunks_to_generate_set.erase(c_pos)
 				continue
 
-			if chunk_data_status.get(c_pos) == true:
-				# Neighbor check: only mesh if 1-ring is ready
-				var neighbors_ready = true
-				for dx in range(-1, 2):
-					for dz in range(-1, 2):
-						if not chunk_data_status.has(c_pos + Vector2i(dx, dz)):
-							neighbors_ready = false
-							break
-					if not neighbors_ready: break
-				
-				if neighbors_ready:
-					chunks_to_generate_set.erase(c_pos)
-					create_chunk(c_pos.x, c_pos.y)
-					processed += 1
-				else:
-					remaining.append(c_pos)
+			# Optimized neighbor check: check status map only
+			var neighbors_ready = true
+			for dx in range(-1, 2):
+				for dz in range(-1, 2):
+					if not chunk_data_status.has(c_pos + Vector2i(dx, dz)):
+						neighbors_ready = false
+						break
+				if not neighbors_ready: break
+			
+			if neighbors_ready:
+				chunks_to_generate_set.erase(c_pos)
+				create_chunk(c_pos.x, c_pos.y)
+				processed += 1
 			else:
-				remaining.append(c_pos)
+				not_ready.append(c_pos)
 		
-		# Put remaining back at the front for next frame
-		while not remaining.is_empty():
-			chunks_to_generate.push_front(remaining.pop_back())
+		# Re-add non-ready chunks to the front for next frame
+		for i in range(not_ready.size() - 1, -1, -1):
+			chunks_to_generate.push_front(not_ready[i])
 
 
 func _on_data_task_finished():
@@ -1023,29 +1003,29 @@ func _unload_distant_chunks(player_pos):
 			to_remove.append(c_pos)
 			
 	for c_pos in to_remove:
-		if chunks[c_pos]:
-			chunks[c_pos].queue_free()
+		var node = chunks[c_pos]
+		if is_instance_valid(node):
+			node.queue_free()
 		chunks.erase(c_pos)
 		chunk_meshed_status.erase(c_pos)
 
 func generate_chunk_data(cx, cz):
 	var c_pos = Vector2i(cx, cz)
 	var chunk_blocks = {}
+	var world_seed_hash = hash(world_seed)
+	
+	var tree_rng = RandomNumberGenerator.new()
 	
 	for x in range(chunk_size):
 		for z in range(chunk_size):
 			var world_x = cx * chunk_size + x
 			var world_z = cz * chunk_size + z
+			
 			var noise_val = (noise.get_noise_2d(world_x, world_z) + 1.0) * 0.5
-			noise_val = pow(noise_val, 3.5)
-			var height = int(noise_val * chunk_height * 1.5) + 6
+			var height = int(pow(noise_val, 3.5) * chunk_height * 1.5) + 6
 			
-			var biome_val = biome_noise.get_noise_2d(world_x, world_z)
-			var is_desert = biome_val < -0.1
+			var is_desert = biome_noise.get_noise_2d(world_x, world_z) < -0.1
 			var is_water_area = height < SEA_LEVEL
-			
-			var tree_rng = RandomNumberGenerator.new()
-			tree_rng.seed = hash(world_seed) + hash(Vector2i(world_x, world_z))
 			
 			for y in range(max(height, SEA_LEVEL) + 1):
 				var type = -1
@@ -1064,24 +1044,21 @@ func generate_chunk_data(cx, cz):
 				if type != -1:
 					chunk_blocks[Vector3i(world_x, y, world_z)] = type
 			
-			# Simple Tree Generation (Within Chunk Data)
-			if not is_desert and not is_water_area and height > SEA_LEVEL + 3 and tree_rng.randf() < 0.02:
-				var tree_height = tree_rng.randi_range(4, 6)
-				for ty in range(tree_height):
-					chunk_blocks[Vector3i(world_x, height + 1 + ty, world_z)] = BlockType.WOOD
-				
-				# Leaves (Simplified: only within this chunk generation, 
-				# for real trees we'd need to handle neighboring chunks too)
-				for lx in range(-2, 3):
-					for lz in range(-2, 3):
-						for ly in range(2):
-							var l_pos = Vector3i(world_x + lx, height + tree_height + ly, world_z + lz)
-							# Check if it's in OUR chunk for simplicity in this thread
-							var l_cx = floor(float(l_pos.x) / chunk_size)
-							var l_cz = floor(float(l_pos.z) / chunk_size)
-							if l_cx == cx and l_cz == cz:
-								if not chunk_blocks.has(l_pos):
-									chunk_blocks[l_pos] = BlockType.LEAVES
+			# Simple Tree Generation
+			if not is_desert and not is_water_area and height > SEA_LEVEL + 3:
+				tree_rng.seed = world_seed_hash + hash(Vector2i(world_x, world_z))
+				if tree_rng.randf() < 0.02:
+					var tree_height = tree_rng.randi_range(4, 6)
+					for ty in range(tree_height):
+						chunk_blocks[Vector3i(world_x, height + 1 + ty, world_z)] = BlockType.WOOD
+					
+					for lx in range(-2, 3):
+						for lz in range(-2, 3):
+							for ly in range(2):
+								var l_pos = Vector3i(world_x + lx, height + tree_height + ly, world_z + lz)
+								if floor(float(l_pos.x) / chunk_size) == cx and floor(float(l_pos.z) / chunk_size) == cz:
+									if not chunk_blocks.has(l_pos):
+										chunk_blocks[l_pos] = BlockType.LEAVES
 	
 	world_mutex.lock()
 	world_data[c_pos] = chunk_blocks
@@ -1094,24 +1071,30 @@ static func is_transparent(type):
 static func is_water(type):
 	return type == BlockType.WATER or type == BlockType.WATER_FLOW
 
-func create_chunk(cx, cz):
+func create_chunk(cx, cz, high_priority = false):
 	var c_pos = Vector2i(cx, cz)
+	
+	# If this is a manual update, remove it from the background queue to avoid redundant work
+	if high_priority and chunks_to_generate_set.has(c_pos):
+		chunks_to_generate_set.erase(c_pos)
+		# We don't remove from the array because it's slow, 
+		# the process_queue will just skip it because chunk_meshed_status will be set.
 	
 	# If already being meshed, mark it for a follow-up rebuild
 	if active_mesh_tasks.has(c_pos):
 		chunks_needing_rebuild[c_pos] = true
 		return
 	
-	# Capture values needed by the thread to avoid accessing 'self' as much as possible
+	# Capture values needed by the thread
 	var current_chunk_size = chunk_size
 	var self_id = get_instance_id()
-	if self_id == 0: return # Should not happen for a live node
+	if self_id == 0: return
 	
 	active_mesh_tasks[c_pos] = WorkerThreadPool.add_task(func(): 
 		var world = instance_from_id(self_id)
 		if is_instance_valid(world):
 			world._threaded_mesh_gen(cx, cz, current_chunk_size)
-	)
+	, high_priority)
 
 func _threaded_mesh_gen(cx, cz, c_size):
 	var c_pos = Vector2i(cx, cz)
@@ -1126,12 +1109,7 @@ func _threaded_mesh_gen(cx, cz, c_size):
 		for z in range(-1, 2):
 			var nc_pos = c_pos + Vector2i(x, z)
 			if world_data.has(nc_pos):
-				# Explicitly duplicate the inner dictionary while locked
-				var original = world_data[nc_pos]
-				var copy = {}
-				for key in original:
-					copy[key] = original[key]
-				relevant_chunks[nc_pos] = copy
+				relevant_chunks[nc_pos] = world_data[nc_pos].duplicate()
 	world_mutex.unlock()
 	
 	var current_chunk_data = relevant_chunks.get(c_pos, {})
@@ -1206,7 +1184,7 @@ func _threaded_mesh_gen(cx, cz, c_size):
 					res.col_verts.append(face.verts[2] + offset)
 					res.col_verts.append(face.verts[3] + offset)
 
-	# Pre-create arrays in the thread
+	# Pre-create arrays and collision shapes in the thread
 	var final_results = []
 	for type in mesh_results:
 		var res = mesh_results[type]
@@ -1217,10 +1195,15 @@ func _threaded_mesh_gen(cx, cz, c_size):
 		arrays[Mesh.ARRAY_NORMAL] = res.normals
 		arrays[Mesh.ARRAY_INDEX] = res.indices
 		
+		var col_shape = null
+		if not res.col_verts.is_empty():
+			col_shape = ConcavePolygonShape3D.new()
+			col_shape.set_faces(res.col_verts)
+		
 		final_results.append({
 			"type": type,
 			"arrays": arrays,
-			"col_verts": res.col_verts
+			"col_shape": col_shape
 		})
 							
 	if is_instance_valid(world):
@@ -1263,10 +1246,9 @@ func _apply_chunk_mesh(cx, cz, final_results, decoration_positions = []):
 		mi.material_override = materials[type]
 		chunk_node.add_child(mi)
 		
-		if not res.col_verts.is_empty():
+		var col_shape = res.get("col_shape")
+		if col_shape:
 			var col = CollisionShape3D.new()
-			var col_shape = ConcavePolygonShape3D.new()
-			col_shape.set_faces(res.col_verts)
 			col.shape = col_shape
 			chunk_node.add_child(col)
 	
