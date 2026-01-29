@@ -178,7 +178,7 @@ func _on_web_file_selected(args):
 		var reader = JavaScriptBridge.create_object("FileReader")
 		_web_reader_callback = JavaScriptBridge.create_callback(func(reader_args):
 			var result = reader_args[0].target.result
-			var bytes = JavaScriptBridge.get_interface("Uint8Array").new(result)
+			var bytes = JavaScriptBridge.create_object("Uint8Array", result)
 			var packed_bytes = PackedByteArray()
 			for i in range(bytes.length): packed_bytes.append(bytes[i])
 			var img = Image.new()

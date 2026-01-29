@@ -374,7 +374,7 @@ func _on_web_file_selected(args):
 		
 		_web_reader_callback = JavaScriptBridge.create_callback(func(reader_args):
 			var result = reader_args[0].target.result
-			var bytes = JavaScriptBridge.get_interface("Uint8Array").new(result)
+			var bytes = JavaScriptBridge.create_object("Uint8Array", result)
 			var packed_bytes = PackedByteArray()
 			# Optimization: Avoid large loops in GDScript if possible
 			# But for a small skin file it should be fine.
