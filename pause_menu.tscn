@@ -54,14 +54,17 @@ horizontal_alignment = 1
 layout_mode = 2
 
 [node name="ResumeButton" type="Button" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/MainContent"]
+custom_minimum_size = Vector2(0, 40)
 layout_mode = 2
 text = "Resume"
 
 [node name="SettingsButton" type="Button" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/MainContent"]
+custom_minimum_size = Vector2(0, 40)
 layout_mode = 2
 text = "Settings"
 
 [node name="QuitButton" type="Button" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/MainContent"]
+custom_minimum_size = Vector2(0, 40)
 layout_mode = 2
 text = "Quit to Title"
 
@@ -74,41 +77,91 @@ layout_mode = 2
 text = "Settings"
 horizontal_alignment = 1
 
-[node name="HBoxFOV" type="HBoxContainer" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent"]
-layout_mode = 2
-
-[node name="FOVLabelUI" type="Label" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/HBoxFOV"]
-custom_minimum_size = Vector2(150, 0)
-layout_mode = 2
-text = "FOV: 75"
-
-[node name="FOVSliderUI" type="HSlider" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/HBoxFOV"]
-layout_mode = 2
-size_flags_horizontal = 3
-min_value = 30.0
-max_value = 110.0
-value = 30.0
-
-[node name="FullscreenCheckBoxUI" type="CheckBox" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent"]
-layout_mode = 2
-text = "Fullscreen"
-
 [node name="BackButtonUI" type="Button" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent"]
 layout_mode = 2
 text = "Back"
 
-[node name="HBoxRender" type="HBoxContainer" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent"]
+[node name="ScrollContainer" type="ScrollContainer" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent"]
+custom_minimum_size = Vector2(0, 300)
 layout_mode = 2
 
-[node name="RenderDistanceLabelUI" type="Label" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/HBoxRender"]
+[node name="SettingsList" type="VBoxContainer" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/ScrollContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="GraphicsSectionLabel" type="Label" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/ScrollContainer/SettingsList"]
+layout_mode = 2
+text = "--- Graphics ---"
+horizontal_alignment = 1
+
+[node name="FullscreenCheckBoxUI" type="CheckBox" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/ScrollContainer/SettingsList"]
+layout_mode = 2
+text = "Borderless Fullscreen"
+
+[node name="RenderDistanceHBox" type="HBoxContainer" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/ScrollContainer/SettingsList"]
 layout_mode = 2
 
-[node name="RenderDistanceSliderUI" type="HSlider" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/HBoxRender"]
+[node name="RenderDistanceLabelUI" type="Label" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/ScrollContainer/SettingsList/RenderDistanceHBox"]
+custom_minimum_size = Vector2(250, 0)
+layout_mode = 2
+text = "Render Distance: 4"
+
+[node name="RenderDistanceSliderUI" type="HSlider" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/ScrollContainer/SettingsList/RenderDistanceHBox"]
 layout_mode = 2
 size_flags_horizontal = 3
 min_value = 2.0
 max_value = 16.0
-value = 2.0
+value = 4.0
+
+[node name="FOVHBox" type="HBoxContainer" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/ScrollContainer/SettingsList"]
+layout_mode = 2
+
+[node name="FOVLabelUI" type="Label" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/ScrollContainer/SettingsList/FOVHBox"]
+custom_minimum_size = Vector2(250, 0)
+layout_mode = 2
+text = "FOV: 75"
+
+[node name="FOVSliderUI" type="HSlider" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/ScrollContainer/SettingsList/FOVHBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = 30.0
+max_value = 110.0
+value = 75.0
+
+[node name="VSyncHBox" type="HBoxContainer" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/ScrollContainer/SettingsList"]
+layout_mode = 2
+
+[node name="VSyncLabelUI" type="Label" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/ScrollContainer/SettingsList/VSyncHBox"]
+layout_mode = 2
+text = "VSync:"
+
+[node name="VSyncCheckBoxUI" type="CheckBox" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/ScrollContainer/SettingsList/VSyncHBox"]
+layout_mode = 2
+
+[node name="ShadowsHBox" type="HBoxContainer" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/ScrollContainer/SettingsList"]
+layout_mode = 2
+
+[node name="ShadowsLabelUI" type="Label" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/ScrollContainer/SettingsList/ShadowsHBox"]
+layout_mode = 2
+text = "Shadows:"
+
+[node name="ShadowsSliderUI" type="HSlider" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/ScrollContainer/SettingsList/ShadowsHBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+max_value = 4.0
+
+[node name="MSAAHBox" type="HBoxContainer" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/ScrollContainer/SettingsList"]
+layout_mode = 2
+
+[node name="MSAALabelUI" type="Label" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/ScrollContainer/SettingsList/MSAAHBox"]
+layout_mode = 2
+text = "Anti-Aliasing:"
+
+[node name="MSAAOptionButtonUI" type="OptionButton" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/ScrollContainer/SettingsList/MSAAHBox"]
+layout_mode = 2
+
+[node name="HSeparator2" type="HSeparator" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer"]
+layout_mode = 2
 
 [node name="HeartsContainer" type="HBoxContainer" parent="."]
 layout_mode = 0

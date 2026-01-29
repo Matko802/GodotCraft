@@ -5,7 +5,7 @@ extends Node3D
 @export var world_seed = "GodotCraft"
 @export var render_distance = 4
 
-enum BlockType { STONE, DIRT, GRASS, SAND, BEDROCK, WOOD, LEAVES, WATER, WATER_FLOW }
+enum BlockType { STONE, DIRT, GRASS, SAND, BEDROCK, WOOD, LEAVES, WATER, WATER_FLOW, TORCH }
 
 const BLOCK_TEXTURES = {
 	0: "res://textures/stone.png",
@@ -14,7 +14,8 @@ const BLOCK_TEXTURES = {
 	3: "res://textures/Sand.png",
 	4: "res://textures/bedrock.png",
 	5: "res://textures/oak_wood_side.png",
-	6: "res://textures/leaves.png"
+	6: "res://textures/leaves.png",
+	9: "res://models/block/torch/torch_0.png"
 }
 
 const BLOCK_SOUNDS = {
@@ -47,6 +48,9 @@ const BLOCK_SOUNDS = {
 		"res://textures/Sounds/block_breaking/wood2.ogg",
 		"res://textures/Sounds/block_breaking/wood3.ogg",
 		"res://textures/Sounds/block_breaking/wood4.ogg"
+	],
+	"wood_hit": [
+		"res://textures/Sounds/block_hit/stone1.ogg"
 	]
 }
 
@@ -56,10 +60,14 @@ const TYPE_TO_SOUND = {
 	BlockType.GRASS: "grass",
 	BlockType.SAND: "sand",
 	BlockType.WOOD: "wood",
-	BlockType.LEAVES: "grass"
+	BlockType.LEAVES: "grass",
+	BlockType.TORCH: "wood"
 }
 
 const DROPPED_ITEM_SCENE = preload("res://dropped_item.tscn")
+
+var torch_mesh: Mesh = null
+var torch_material: Material = null
 
 var world_data = {} # {Vector2i: {Vector3i: type}}
 var water_levels = {} # {Vector2i: {Vector3i: level}}
@@ -71,6 +79,15 @@ var water_timer = 0.0
 var water_update_queue = {} # Using dictionary as a set: {Vector3i: bool}
 var water_tick_timer = 0.0
 var water_frame = 0
+
+var _autosave_timer = 0.0
+const AUTOSAVE_INTERVAL = 300.0 # 5 minutes
+
+enum LoadingStage { ASSETS, CHUNKS }
+var _current_stage = LoadingStage.ASSETS
+var _assets_to_load = []
+var _total_assets = 0
+var _loaded_assets = 0
 
 var last_player_chunk = Vector2i(999, 999)
 var chunks_data_to_generate = [] 
@@ -328,8 +345,14 @@ func _rebuild_chunk(c_pos: Vector2i):
 	# Instead, we will replace the node once the new one is ready
 	create_chunk(c_pos.x, c_pos.y)
 
+func _enter_tree():
+	_setup_materials()
+
 func _ready():
 	add_to_group("world")
+	
+	_gather_assets()
+	
 	var state = get_node_or_null("/root/GameState")
 	if state:
 		world_seed = state.world_seed
@@ -343,8 +366,6 @@ func _ready():
 	biome_noise.seed = hash(world_seed) + 1234
 	biome_noise.frequency = 0.003
 	biome_noise.noise_type = FastNoiseLite.TYPE_PERLIN
-	
-	_setup_materials()
 	
 	# Prepare loading screen
 	if has_node("LoadingLayer"):
@@ -374,12 +395,107 @@ func _ready():
 	last_player_chunk = Vector2i(floor(p_pos.x / chunk_size), floor(p_pos.z / chunk_size))
 
 	_update_sun_rotation()
+	
+	if state:
+		state.settings_changed.connect(_apply_settings)
+		_apply_settings()
 
 	# Calculate total spawn chunks for progress bar, but we'll finish earlier
 	total_spawn_chunks = (render_distance * 2 + 1) * (render_distance * 2 + 1)
 	
-	# Immediately trigger chunk updates
-	update_chunks(p_pos)
+	# Start asset loading
+	if _assets_to_load.is_empty():
+		_current_stage = LoadingStage.CHUNKS
+		update_chunks(p_pos)
+	else:
+		for path in _assets_to_load:
+			ResourceLoader.load_threaded_request(path)
+
+func _gather_assets():
+	var paths = []
+	# Textures
+	for type in BLOCK_TEXTURES:
+		paths.append(BLOCK_TEXTURES[type])
+	
+	paths.append("res://textures/grass_top.png")
+	paths.append("res://textures/dirt.png")
+	paths.append("res://textures/oak_wood_top.png")
+	paths.append("res://textures/water0.png")
+	paths.append("res://textures/water1.png")
+	paths.append("res://textures/sky/sun.png")
+	paths.append("res://textures/sky/moon.png")
+	
+	# Sounds
+	for cat in BLOCK_SOUNDS:
+		for s in BLOCK_SOUNDS[cat]:
+			paths.append(s)
+	
+	# Models
+	paths.append("res://models/block/torch/torch.gltf")
+	
+	# Filter duplicates and non-existent
+	for p in paths:
+		if not p in _assets_to_load and ResourceLoader.exists(p):
+			_assets_to_load.append(p)
+	
+	_total_assets = _assets_to_load.size()
+
+func _apply_settings():
+	var state = get_node_or_null("/root/GameState")
+	if state and sun:
+		if state.shadow_quality == 0:
+			sun.shadow_enabled = false
+		else:
+			sun.shadow_enabled = true
+			match state.shadow_quality:
+				1: # Low
+					sun.shadow_blur = 0.5
+					sun.directional_shadow_max_distance = 256.0
+				2: # Medium
+					sun.shadow_blur = 1.0
+					sun.directional_shadow_max_distance = 128.0
+				3: # High
+					sun.shadow_blur = 1.5
+					sun.directional_shadow_max_distance = 96.0
+				4: # Ultra
+					sun.shadow_blur = 2.0
+					sun.directional_shadow_max_distance = 64.0
+		
+		# Common shadow settings
+		sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
+		sun.shadow_bias = 0.02
+		sun.shadow_normal_bias = 1.0
+	
+	_update_torch_lights()
+
+func _update_torch_lights():
+	var state = get_node_or_null("/root/GameState")
+	if not state: return
+	
+	for light in get_tree().get_nodes_in_group("torch_lights"):
+		if light is OmniLight3D:
+			# Skip the player's held torch light
+			if light.name == "HandLight": continue
+			_apply_shadow_settings_to_light(light, state.shadow_quality)
+
+func _apply_shadow_settings_to_light(light: OmniLight3D, quality: int):
+	light.shadow_enabled = quality > 0
+	if quality > 0:
+		var blur = 0.0
+		match quality:
+			1: # Low - Very Sharp/Pixelated
+				blur = 0.0
+			2: # Medium - Slightly soft
+				blur = 1.0
+			3: # High - Soft
+				blur = 2.5
+			4: # Ultra - Very soft
+				blur = 4.5
+		
+		light.shadow_blur = blur
+		light.shadow_opacity = 1.0 # Keep shadow darkness/brightness constant
+		light.shadow_bias = 0.05
+		light.shadow_normal_bias = 1.0
 
 func _load_world_data(data):
 	world_mutex.lock()
@@ -397,8 +513,15 @@ func _load_world_data(data):
 	
 	if data.has("player_pos") and has_node("Player"):
 		var p_pos = data["player_pos"]
-		$Player.global_position = p_pos
-		$Player.rotation = data.get("player_rot", Vector3.ZERO)
+		var p = $Player
+		p.global_position = p_pos
+		p.rotation = data.get("player_rot", Vector3.ZERO)
+		
+		if data.has("selected_slot"):
+			p.selected_slot = data["selected_slot"]
+			if p.inventory_ui:
+				p.inventory_ui.set_selected(p.selected_slot)
+			p._update_held_item_mesh()
 		
 	if data.has("inventory") and has_node("Player/Inventory"):
 		var inv = $Player/Inventory
@@ -459,29 +582,30 @@ func _update_sun_rotation():
 	var strength = sin(cycle_pos * PI)
 	
 	# Light energy: bright at day, dim at night but still visible
-	sun.light_energy = strength * (1.1 if is_day else 0.2) + 0.15
-	sun.light_color = Color(1.0, 0.95, 0.8).lerp(Color(0.5, 0.5, 0.8), 0.0 if is_day else 1.0)
+	sun.light_energy = strength * (0.9 if is_day else 0.25) + 0.2
+	sun.light_color = Color(1.0, 0.95, 0.8).lerp(Color(0.6, 0.6, 0.9), 0.0 if is_day else 1.0)
 	
 	if world_env:
 		var env = world_env.environment
-		var day_sky = Color(0.5, 0.7, 1.0)
-		var night_sky = Color(0.1, 0.1, 0.15) # Brighter night sky
+		env.tonemap_mode = 1 # TONEMAP_REINHARD
+		env.tonemap_exposure = 0.8
+		
+		var day_sky = Color(0.4, 0.6, 1.0) # Slightly darker sky
+		var night_sky = Color(0.1, 0.1, 0.2) # Brightened night sky
 		
 		var sky_color = night_sky.lerp(day_sky, strength if is_day else 0.0)
-		var horizon_color = sky_color.darkened(0.1)
+		var horizon_color = sky_color.darkened(0.2)
 		
-		env.sky.sky_material.sky_top_color = sky_color
-		env.sky.sky_material.sky_horizon_color = horizon_color
-		env.sky.sky_material.ground_bottom_color = horizon_color
-		env.sky.sky_material.ground_horizon_color = horizon_color
+		if env.sky and env.sky.sky_material:
+			env.sky.sky_material.sky_top_color = sky_color
+			env.sky.sky_material.sky_horizon_color = horizon_color
+			env.sky.sky_material.ground_bottom_color = horizon_color
+			env.sky.sky_material.ground_horizon_color = horizon_color
 		
-		# Set ambient light to around 40% at night to keep everything visible
-		env.ambient_light_energy = strength * (1.0 if is_day else 0.4) + 0.15
-		env.ambient_light_color = Color(1, 1, 1).lerp(Color(0.4, 0.4, 0.6), 0.0 if is_day else 1.0)
+		env.ambient_light_energy = (strength * 0.25 + 0.1) if is_day else 0.08
+		env.ambient_light_color = Color(1, 1, 1).lerp(Color(0.3, 0.3, 0.5), 0.0 if is_day else 1.0)
 		
 		# Adjust fog for atmospheric depth
-		# Volumetric fog is Forward+ only, so we avoid setting it if not needed
-		# But we can still adjust basic fog if it were enabled
 		pass
 
 func save_game():
@@ -490,8 +614,14 @@ func save_game():
 		# Hide UI for screenshot
 		var hud = get_node_or_null("Player/HUD")
 		var pause_layer = get_node_or_null("Player/PauseLayer")
+		var player = get_tree().get_first_node_in_group("player")
+		var view_model = null
+		if player:
+			view_model = player.get_node_or_null("SpringArm3D/Camera3D/ViewModelArm")
+			
 		if hud: hud.visible = false
 		if pause_layer: pause_layer.visible = false
+		if view_model: view_model.visible = false
 		
 		# Wait for render frame to ensure UI is hidden in capture
 		await RenderingServer.frame_post_draw
@@ -503,6 +633,7 @@ func save_game():
 		# Restore UI immediately so user doesn't see flicker
 		if hud: hud.visible = true
 		if pause_layer: pause_layer.visible = true
+		if view_model: view_model.visible = player.current_camera_mode == player.CameraMode.FIRST_PERSON
 
 		var inv_data = {"hotbar": [], "inventory": []}
 		if has_node("Player/Inventory"):
@@ -527,6 +658,7 @@ func save_game():
 			"chunk_data_status": chunk_data_status.duplicate(),
 			"player_pos": $Player.global_position,
 			"player_rot": $Player.rotation,
+			"selected_slot": $Player.selected_slot if has_node("Player") else 0,
 			"inventory": inv_data,
 			"rules": state.rules.duplicate(),
 			"ops": state.ops.duplicate(),
@@ -612,21 +744,62 @@ func _setup_materials():
 		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
 		moon_node.material_override = mat
+		
+	# Torch Mesh Setup
+	var torch_scene = load("res://models/block/torch/torch.gltf").instantiate()
+	var torch_mesh_instances = torch_scene.find_children("*", "MeshInstance3D", true)
+	if not torch_mesh_instances.is_empty():
+		var torch_model_mesh_instance = torch_mesh_instances[0]
+		torch_mesh = torch_model_mesh_instance.mesh
+		torch_material = torch_model_mesh_instance.mesh.surface_get_material(0)
+		if not torch_material:
+			torch_material = torch_model_mesh_instance.material_override
+		
+		# Make torch always bright
+		if torch_material:
+			torch_material = torch_material.duplicate()
+			torch_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	torch_scene.free()
 
 func _process(delta):
-	if not is_loading:
-		# Update time
-		time += delta * TICKS_PER_SECOND
-		if time >= MAX_TIME:
-			time -= MAX_TIME
-		_update_sun_rotation()
-
 	if is_loading:
-		_update_loading_progress()
 		var p_pos = spawn_pos
 		if has_node("Player"): p_pos = $Player.global_position
+
+		if _current_stage == LoadingStage.ASSETS:
+			var all_done = true
+			var loaded_count = 0
+			for path in _assets_to_load:
+				var status = ResourceLoader.load_threaded_get_status(path)
+				if status == ResourceLoader.THREAD_LOAD_LOADED:
+					loaded_count += 1
+				else:
+					all_done = false
+			
+			_loaded_assets = loaded_count
+			
+			if all_done:
+				_current_stage = LoadingStage.CHUNKS
+				update_chunks(p_pos)
+		
+		_update_loading_progress()
 		_process_generation_queue(p_pos)
 		return
+
+	# Update time
+	time += delta * TICKS_PER_SECOND
+	if time >= MAX_TIME:
+		time -= MAX_TIME
+	_update_sun_rotation()
+
+	# Update autosave timer
+	_autosave_timer += delta
+	if _autosave_timer >= AUTOSAVE_INTERVAL:
+		_autosave_timer = 0.0
+		save_game()
+		var player = get_tree().get_first_node_in_group("player")
+		if player and player.chat_ui:
+			player.chat_ui.add_message("[color=gray]Autosaving...[/color]")
 
 	if has_node("Player"):
 		var player_pos = $Player.global_position
@@ -663,6 +836,13 @@ func _update_loading_progress():
 	var p_pos = spawn_pos
 	if has_node("Player"): p_pos = $Player.global_position
 	
+	if _current_stage == LoadingStage.ASSETS:
+		if has_node("LoadingLayer/StatusLabel"):
+			$LoadingLayer/StatusLabel.text = "Loading Assets: %d / %d" % [_loaded_assets, _total_assets]
+		if has_node("LoadingLayer/ProgressBar"):
+			$LoadingLayer/ProgressBar.value = (float(_loaded_assets) / _total_assets) * 50.0 # First 50% for assets
+		return
+
 	var p_x = floor(p_pos.x / chunk_size)
 	var p_z = floor(p_pos.z / chunk_size)
 	
@@ -682,13 +862,12 @@ func _update_loading_progress():
 		else:
 			$LoadingLayer/StatusLabel.text = "Building World Meshes: %d / %d" % [loaded_count, total_spawn_chunks]
 
-	var progress = (float(loaded_count) / total_spawn_chunks) * 100
+	var progress = 50.0 + (float(loaded_count) / total_spawn_chunks) * 50.0
 	if has_node("LoadingLayer/ProgressBar"):
 		$LoadingLayer/ProgressBar.value = progress
 	
-	# Finish loading as soon as a minimal area is ready (user requested 2 chunks)
-	# We'll check if at least 2 chunks in the immediate vicinity are meshed.
-	if loaded_count >= 2 or loaded_count >= total_spawn_chunks:
+	# Finish loading as soon as a minimal area is ready
+	if loaded_count >= 1 or loaded_count >= total_spawn_chunks:
 		_finish_loading()
 
 func _finish_loading():
@@ -906,7 +1085,7 @@ func generate_chunk_data(cx, cz):
 	world_mutex.unlock()
 
 static func is_transparent(type):
-	return type == -1 or type == BlockType.WATER or type == BlockType.WATER_FLOW or type == BlockType.LEAVES
+	return type == -1 or type == BlockType.WATER or type == BlockType.WATER_FLOW or type == BlockType.LEAVES or type == BlockType.TORCH
 
 static func is_water(type):
 	return type == BlockType.WATER or type == BlockType.WATER_FLOW
@@ -933,9 +1112,9 @@ func create_chunk(cx, cz):
 func _threaded_mesh_gen(cx, cz, c_size):
 	var c_pos = Vector2i(cx, cz)
 	var self_id = get_instance_id()
-	var mesh_results = {} # type -> { "arrays": [], "collision_shape": ConcavePolygonShape3D }
+	var mesh_results = {} # type -> { "verts": [], ... }
 	
-	# Important: Snapshot the data inside the mutex to avoid concurrent modification issues
+	# Important: Snapshot the data inside the mutex
 	var relevant_chunks = {}
 	world_mutex.lock()
 	for x in range(-1, 2):
@@ -952,11 +1131,21 @@ func _threaded_mesh_gen(cx, cz, c_size):
 	
 	var current_chunk_data = relevant_chunks.get(c_pos, {})
 	if current_chunk_data.is_empty():
-		call_deferred("_apply_chunk_mesh", cx, cz, [])
+		var world = instance_from_id(self_id)
+		if is_instance_valid(world):
+			world.call_deferred("_apply_chunk_mesh", cx, cz, [], [])
 		return
 	
+	var decoration_positions = [] # [{type: int, pos: Vector3}]
+
 	for pos in current_chunk_data:
 		var type = current_chunk_data[pos]
+		
+		# Skip decoration blocks from solid mesh
+		if type == BlockType.TORCH:
+			decoration_positions.append({"type": type, "pos": Vector3(pos)})
+			continue
+
 		var type_is_water = is_water(type)
 		
 		# Local coordinates for vertex generation
@@ -1013,7 +1202,7 @@ func _threaded_mesh_gen(cx, cz, c_size):
 					res.col_verts.append(face.verts[2] + offset)
 					res.col_verts.append(face.verts[3] + offset)
 
-	# Pre-create resources in the thread
+	# Pre-create arrays in the thread
 	var final_results = []
 	for type in mesh_results:
 		var res = mesh_results[type]
@@ -1024,22 +1213,17 @@ func _threaded_mesh_gen(cx, cz, c_size):
 		arrays[Mesh.ARRAY_NORMAL] = res.normals
 		arrays[Mesh.ARRAY_INDEX] = res.indices
 		
-		var col_shape = null
-		if not res.col_verts.is_empty():
-			col_shape = ConcavePolygonShape3D.new()
-			col_shape.set_faces(res.col_verts)
-			
 		final_results.append({
 			"type": type,
 			"arrays": arrays,
-			"collision_shape": col_shape
+			"col_verts": res.col_verts
 		})
 							
 	var world = instance_from_id(self_id)
-	if world:
-		world.call_deferred("_apply_chunk_mesh", cx, cz, final_results)
+	if is_instance_valid(world):
+		world.call_deferred("_apply_chunk_mesh", cx, cz, final_results, decoration_positions)
 
-func _apply_chunk_mesh(cx, cz, final_results):
+func _apply_chunk_mesh(cx, cz, final_results, decoration_positions = []):
 	var c_pos = Vector2i(cx, cz)
 	active_mesh_tasks.erase(c_pos)
 	chunk_meshed_status[c_pos] = true
@@ -1048,10 +1232,9 @@ func _apply_chunk_mesh(cx, cz, final_results):
 	if chunks.has(c_pos):
 		chunks[c_pos].queue_free()
 	
-	# If no results (empty chunk), just clean up
-	if final_results.is_empty():
+	# If no results and no decorations, just clean up
+	if final_results.is_empty() and decoration_positions.is_empty():
 		chunks.erase(c_pos)
-		# Check if it was made dirty while we were "generating" nothing
 		if chunks_needing_rebuild.has(c_pos):
 			chunks_needing_rebuild.erase(c_pos)
 			create_chunk(cx, cz)
@@ -1077,10 +1260,77 @@ func _apply_chunk_mesh(cx, cz, final_results):
 		mi.material_override = materials[type]
 		chunk_node.add_child(mi)
 		
-		if res.collision_shape:
+		if not res.col_verts.is_empty():
 			var col = CollisionShape3D.new()
-			col.shape = res.collision_shape
+			var col_shape = ConcavePolygonShape3D.new()
+			col_shape.set_faces(res.col_verts)
+			col.shape = col_shape
 			chunk_node.add_child(col)
+	
+	# Handle Torches using MultiMesh for optimization
+	var torch_count = 0
+	for deco in decoration_positions:
+		if deco.type == BlockType.TORCH:
+			torch_count += 1
+			
+	if torch_count > 0 and torch_mesh:
+		var mm = MultiMesh.new()
+		mm.transform_format = MultiMesh.TRANSFORM_3D
+		mm.mesh = torch_mesh
+		mm.instance_count = torch_count
+		
+		var mmi = MultiMeshInstance3D.new()
+		mmi.multimesh = mm
+		mmi.material_override = torch_material
+		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		mmi.layers = 8 # Layer 4
+		chunk_node.add_child(mmi)
+		
+		# Create a separate body for torch collisions on Layer 3 (mask 4)
+		# This allows players to walk through torches (player mask is 1)
+		# while still allowing raycasts (mask 5) to hit them.
+		var deco_node = StaticBody3D.new()
+		deco_node.collision_layer = 4
+		deco_node.collision_mask = 0
+		chunk_node.add_child(deco_node)
+		
+		var idx = 0
+		for deco in decoration_positions:
+			if deco.type == BlockType.TORCH:
+				# deco.pos is in world coordinates
+				var local_pos = deco.pos - chunk_node.position + Vector3(0.5, 0, 0.5)
+				mm.set_instance_transform(idx, Transform3D(Basis(), local_pos))
+				
+				# Add dynamic light
+				var light = OmniLight3D.new()
+				light.add_to_group("torch_lights")
+				light.light_color = Color(1.0, 0.7, 0.3)
+				light.light_energy = 1.5
+				light.omni_range = 7.0
+				light.position = local_pos + Vector3(0, 0.5, 0)
+				
+				# Initialize shadow settings
+				var state = get_node_or_null("/root/GameState")
+				if state:
+					_apply_shadow_settings_to_light(light, state.shadow_quality)
+				else:
+					light.shadow_enabled = true
+					
+				light.light_cull_mask = 4294967295 - 8 # Ignore Torches (Layer 4) only
+				light.distance_fade_enabled = true
+				light.distance_fade_begin = 20.0
+				light.distance_fade_length = 5.0
+				chunk_node.add_child(light)
+				
+				# Add collision to the deco_node instead of the main chunk_node
+				var col = CollisionShape3D.new()
+				var box = BoxShape3D.new()
+				box.size = Vector3(0.5, 0.8, 0.5) # More accurate torch hit-box
+				col.shape = box
+				col.position = local_pos + Vector3(0, 0.4, 0)
+				deco_node.add_child(col)
+				
+				idx += 1
 	
 	# After applying, check if we need to rebuild because of a block change
 	if chunks_needing_rebuild.has(c_pos):

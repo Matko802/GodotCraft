@@ -1,4 +1,4 @@
-[gd_scene load_steps=14 format=3 uid="uid://ojwlgihwqr3w"]
+[gd_scene format=3 uid="uid://ojwlgihwqr3w"]
 
 [ext_resource type="Script" uid="uid://1mdo6tyjtkx7" path="res://player.gd" id="1_4flbx"]
 [ext_resource type="PackedScene" uid="uid://crro41sc8pku" path="res://models/player/slim/slimhand.gltf" id="2_n7ghd"]
@@ -19,25 +19,25 @@ height = 1.78125
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_onrkg"]
 shader = ExtResource("2_onrkg")
 
-[node name="Player" type="CharacterBody3D"]
+[node name="Player" type="CharacterBody3D" unique_id=1974353613]
 script = ExtResource("1_4flbx")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=1924600090]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.109375, 0)
 shape = SubResource("CapsuleShape3D_dw050")
 debug_color = Color(0.9930344, 0, 0.25015664, 0.41960785)
 
-[node name="Shaders" type="Node" parent="."]
+[node name="Shaders" type="Node" parent="." unique_id=1412453349]
 
-[node name="HUD" type="CanvasLayer" parent="."]
+[node name="HUD" type="CanvasLayer" parent="." unique_id=1588428464]
 
-[node name="CrosshairContainer" type="CenterContainer" parent="HUD"]
+[node name="CrosshairContainer" type="CenterContainer" parent="HUD" unique_id=1782335517]
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 mouse_filter = 2
 
-[node name="CrosshairTexture" type="TextureRect" parent="HUD/CrosshairContainer"]
+[node name="CrosshairTexture" type="TextureRect" parent="HUD/CrosshairContainer" unique_id=2069600268]
 texture_filter = 1
 material = SubResource("ShaderMaterial_onrkg")
 custom_minimum_size = Vector2(32, 32)
@@ -47,51 +47,87 @@ texture = ExtResource("3_i3pqv")
 expand_mode = 1
 stretch_mode = 5
 
-[node name="InventoryUI" parent="HUD" instance=ExtResource("4_2hs0m")]
+[node name="ChatUI" parent="HUD" unique_id=1091655810 instance=ExtResource("5_dw050")]
+process_mode = 3
+
+[node name="InventoryUI" parent="HUD" unique_id=637879094 instance=ExtResource("4_2hs0m")]
 mouse_filter = 2
 
-[node name="ChatUI" parent="HUD" instance=ExtResource("5_dw050")]
+[node name="DebugMenu" parent="HUD" unique_id=468153908 instance=ExtResource("7_n7ghd")]
 
-[node name="DebugMenu" parent="HUD" instance=ExtResource("7_n7ghd")]
-
-[node name="Inventory" type="Node" parent="."]
+[node name="Inventory" type="Node" parent="." unique_id=1812314863]
 script = ExtResource("4_hqtel")
 
-[node name="PauseLayer" type="CanvasLayer" parent="."]
+[node name="PauseLayer" type="CanvasLayer" parent="." unique_id=2080907330]
 layer = 10
 
-[node name="PauseMenu" parent="PauseLayer" instance=ExtResource("5_1jxqw")]
+[node name="PauseMenu" parent="PauseLayer" unique_id=1566094500 instance=ExtResource("5_1jxqw")]
 
-[node name="PlayerModel" parent="." instance=ExtResource("9_b26j0")]
+[node name="PlayerModel" parent="." unique_id=1861412354 instance=ExtResource("9_b26j0")]
 transform = Transform3D(0.9, 0, 0, 0, 0.9, 0, 0, 0, 0.9, 0, -0.9912943, 0)
 
-[node name="ViewModelAnimationPlayer" type="AnimationPlayer" parent="."]
+[node name="ViewModelAnimationPlayer" type="AnimationPlayer" parent="." unique_id=1165413982]
 
-[node name="TPHeldItemRoot" type="Node3D" parent="."]
+[node name="TPHeldItemRoot" type="Node3D" parent="." unique_id=617698788]
 
-[node name="TPHeldItemMesh" type="MeshInstance3D" parent="TPHeldItemRoot"]
-transform = Transform3D(0.7071067, 0, 0.70710677, 0, 1, 0, -0.70710677, 0, 0.7071067, 0.3448208, -0.12444234, -0.2553643)
+[node name="TPHeldItemMesh" type="MeshInstance3D" parent="TPHeldItemRoot" unique_id=2905852]
+transform = Transform3D(0.39999998, 0, 0, 0, 0.2828427, 0.2828427, 0, -0.2828427, 0.2828427, 0.321, -0.271, 0.023901299)
 
-[node name="SpringArm3D" type="SpringArm3D" parent="."]
+[node name="SpringArm3D" type="SpringArm3D" parent="." unique_id=841691994]
 spring_length = 4.0
 margin = 0.15
 
-[node name="Camera3D" type="Camera3D" parent="SpringArm3D"]
+[node name="Camera3D" type="Camera3D" parent="SpringArm3D" unique_id=335347444]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.7397363, 0)
+cull_mask = 1048573
 
-[node name="RayCast3D" type="RayCast3D" parent="SpringArm3D/Camera3D"]
+[node name="ViewModelLayer" type="CanvasLayer" parent="." unique_id=1766187173]
+layer = 0
+
+[node name="ViewModelContainer" type="SubViewportContainer" parent="ViewModelLayer" unique_id=990539243]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+stretch = true
+
+[node name="SubViewport" type="SubViewport" parent="ViewModelLayer/ViewModelContainer" unique_id=474077127]
+transparent_bg = true
+handle_input_locally = false
+gui_disable_input = true
+size = Vector2i(1152, 648)
+render_target_update_mode = 4
+
+[node name="ViewModelCamera" type="Camera3D" parent="ViewModelLayer/ViewModelContainer/SubViewport" unique_id=1340250425]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.737977, 0)
+cull_mask = 2
+
+[node name="ViewModelArm" type="Node3D" parent="ViewModelLayer/ViewModelContainer/SubViewport/ViewModelCamera" unique_id=1896815348]
+transform = Transform3D(0.845588, 0, -0.5338359, 0, 1, 0, 0.5338359, 0, 0.845588, 0.4, -0.4, -0.6)
+
+[node name="WideHandModel" parent="ViewModelLayer/ViewModelContainer/SubViewport/ViewModelCamera/ViewModelArm" unique_id=1759246642 instance=ExtResource("3_nvl01")]
+transform = Transform3D(0.4615478, 0.11281443, 0.8799118, 0.82067645, -0.43092188, -0.37522703, 0.33684272, 0.89530855, -0.29147518, -0.17556804, 0.033577055, -1.1137364)
+
+[node name="SlimHandModel" parent="ViewModelLayer/ViewModelContainer/SubViewport/ViewModelCamera/ViewModelArm" unique_id=695351138 instance=ExtResource("2_n7ghd")]
+transform = Transform3D(0.46154803, 0.112814456, 0.8799126, 0.8206767, -0.43092227, -0.37522724, 0.3368428, 0.89530945, -0.2914756, -0.17556804, 0.033577055, -1.1137364)
+
+[node name="HeldItemRoot" type="Node3D" parent="ViewModelLayer/ViewModelContainer/SubViewport/ViewModelCamera/ViewModelArm" unique_id=979476552]
+transform = Transform3D(1.0000001, 0, 0, 0, 0.99999946, 0, 0, 0, 0.99999976, 0.23343793, 0.025216252, -0.12653667)
+
+[node name="HeldItemMesh" type="MeshInstance3D" parent="ViewModelLayer/ViewModelContainer/SubViewport/ViewModelCamera/ViewModelArm/HeldItemRoot" unique_id=991977066]
+
+[node name="HeldTorchRoot" type="Node3D" parent="ViewModelLayer/ViewModelContainer/SubViewport/ViewModelCamera/ViewModelArm" unique_id=280383770]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.24977916, -0.09684861, 0.054311156)
+
+[node name="HandTorchMesh" type="MeshInstance3D" parent="ViewModelLayer/ViewModelContainer/SubViewport/ViewModelCamera/ViewModelArm/HeldTorchRoot" unique_id=2052728096]
+
+[node name="TPHeldTorchRoot" type="Node3D" parent="." unique_id=355973195]
+
+[node name="TPHeldTorchMesh" type="MeshInstance3D" parent="TPHeldTorchRoot" unique_id=649941816]
+transform = Transform3D(0.6999999, 0, 0, 0, -0.12155374, 0.68936545, 0, -0.68936545, -0.12155374, 0.32091597, -0.3047619, 0.14020574)
+
+[node name="RayCastPivot" type="Node3D" parent="." unique_id=299112077]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.65, 0)
+
+[node name="RayCast3D" type="RayCast3D" parent="RayCastPivot" unique_id=1056537454]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.08973634, 0)
 target_position = Vector3(0, 0, -5)
-
-[node name="ViewModelArm" type="Node3D" parent="SpringArm3D/Camera3D"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.008673191, 0, 0)
-
-[node name="SlimHandModel" parent="SpringArm3D/Camera3D/ViewModelArm" instance=ExtResource("2_n7ghd")]
-transform = Transform3D(0.9021536, 0.30435053, -0.30576137, 0.12372339, -0.86149156, -0.49246833, -0.41329378, 0.40645215, -0.81485295, 0.29611862, 0.42191756, -1.4686121)
-
-[node name="HeldItemRoot" type="Node3D" parent="SpringArm3D/Camera3D/ViewModelArm"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.8705916, -0.21652508, -1.3352511)
-
-[node name="HeldItemMesh" type="MeshInstance3D" parent="SpringArm3D/Camera3D/ViewModelArm/HeldItemRoot"]
-
-[node name="WideHandModel" parent="SpringArm3D/Camera3D/ViewModelArm" instance=ExtResource("3_nvl01")]
-transform = Transform3D(0.9021536, 0.30435053, -0.30576137, 0.12372339, -0.86149156, -0.49246833, -0.41329378, 0.40645215, -0.81485295, 0.29611862, 0.42191756, -1.4686121)

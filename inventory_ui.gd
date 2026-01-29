@@ -9,13 +9,17 @@ extends Control
 @onready var hotbar_container = $HotbarPanel/HotbarContainer
 @onready var main_inventory_grid = $MainInventoryPanel/InventoryTabs/Inventory/InventoryGridContainer
 @onready var main_hotbar_grid = $MainInventoryPanel/InventoryTabs/Inventory/MainHotbarGridContainer
-@onready var creative_grid = $MainInventoryPanel/InventoryTabs/Creative/CreativeGridContainer
+@onready var creative_grid = $MainInventoryPanel/InventoryTabs/Creative/CreativeHBox/CreativeGridContainer
+@onready var trash_slot = $MainInventoryPanel/InventoryTabs/Creative/CreativeHBox/TrashSlot
 @onready var tabs = $MainInventoryPanel/InventoryTabs
+@onready var tooltip_panel = $TooltipPanel
+@onready var tooltip_label = $TooltipPanel/TooltipLabel
 
 var slot_scene = preload("res://inventory_slot.tscn")
 var inventory_ref = null
 var selected_slot = 0
 var holding_item = null # { "type": int, "count": int }
+var hovered_slot = null
 
 var block_textures = {
 	0: preload("res://textures/stone.png"),
@@ -25,7 +29,20 @@ var block_textures = {
 	4: preload("res://textures/bedrock.png"),
 	5: preload("res://textures/oak_wood_side.png"),
 	6: preload("res://textures/leaves.png"),
-	7: preload("res://textures/water0.png")
+	7: preload("res://textures/water0.png"),
+	9: preload("res://textures/torchpreviewinventory.png")
+}
+
+var block_names = {
+	0: "Stone",
+	1: "Dirt",
+	2: "Grass Block",
+	3: "Sand",
+	4: "Bedrock",
+	5: "Oak Log",
+	6: "Oak Leaves",
+	7: "Water",
+	9: "Torch"
 }
 
 var heart_full = preload("res://textures/hearts/heart_full.png")
@@ -34,9 +51,41 @@ var heart_half = preload("res://textures/hearts/heart_half.png")
 func _ready():
 	main_inventory_panel.visible = false
 	
+	# Fix HotbarPanel layout
+	$HotbarPanel.anchors_preset = Control.PRESET_BOTTOM_WIDE
+	$HotbarPanel.anchor_left = 0.5
+	$HotbarPanel.anchor_right = 0.5
+	$HotbarPanel.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	$HotbarPanel.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	$HotbarPanel.offset_left = -225
+	$HotbarPanel.offset_right = 225
+	$HotbarPanel.offset_top = -62
+	$HotbarPanel.offset_bottom = -10
+	$HotbarPanel.custom_minimum_size = Vector2(450, 52)
+	
+	var hotbar_style = StyleBoxFlat.new()
+	hotbar_style.bg_color = Color(0, 0, 0, 0.4)
+	hotbar_style.set_content_margin_all(2)
+	$HotbarPanel.add_theme_stylebox_override("panel", hotbar_style)
+	
 	if creative_grid:
 		creative_grid.columns = 9
 		_setup_creative_inventory()
+
+	if trash_slot:
+		var x_label = Label.new()
+		x_label.text = "X"
+		x_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		x_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		x_label.add_theme_font_size_override("font_size", 32)
+		x_label.add_theme_color_override("font_color", Color(0.8, 0.2, 0.2))
+		x_label.set_anchors_preset(Control.PRESET_FULL_RECT)
+		trash_slot.add_child(x_label)
+		trash_slot.move_child(x_label, 1) # Put it behind icon but above background
+		trash_slot.slot_clicked.connect(_on_trash_slot_clicked)
+		trash_slot.mouse_entered.connect(_on_slot_mouse_entered.bind(trash_slot))
+		trash_slot.mouse_exited.connect(_on_slot_mouse_exited.bind(trash_slot))
+		trash_slot.custom_tooltip = "Trash (Shift+Click to clear all)"
 
 	# Selection outline settings
 	var sel_style = StyleBoxFlat.new()
@@ -57,6 +106,10 @@ func _ready():
 	selection_outline.z_index = 5
 	selection_outline.top_level = true 
 	selection_outline.visible = false	
+	
+	# Style tooltip
+	tooltip_panel.visible = false
+	
 	# Fix for resolution changes
 	resized.connect(_update_selection_outline)
 	resized.connect(_update_hearts_position)
@@ -66,9 +119,39 @@ func _ready():
 		state.settings_changed.connect(_update_hearts_position)
 
 func _process(_delta):
+	if tooltip_panel.visible:
+		var mouse_pos = get_global_mouse_position()
+		tooltip_panel.global_position = mouse_pos + Vector2(20, 20)
+		
+		# Boundary check
+		var screen_size = get_viewport_rect().size
+		if tooltip_panel.global_position.x + tooltip_panel.size.x > screen_size.x:
+			tooltip_panel.global_position.x = mouse_pos.x - tooltip_panel.size.x - 10
+		if tooltip_panel.global_position.y + tooltip_panel.size.y > screen_size.y:
+			tooltip_panel.global_position.y = mouse_pos.y - tooltip_panel.size.y - 10
+
 	if holding_item:
 		# Center 48x48 icon on cursor
 		floating_item_ui.global_position = get_global_mouse_position() - Vector2(24, 24)
+
+func _on_slot_mouse_entered(slot):
+	hovered_slot = slot
+	_update_tooltip_visibility()
+
+func _on_slot_mouse_exited(_slot):
+	hovered_slot = null
+	_update_tooltip_visibility()
+
+func _update_tooltip_visibility():
+	if not main_inventory_panel.visible or holding_item or not hovered_slot:
+		tooltip_panel.visible = false
+		return
+		
+	if hovered_slot.get("custom_tooltip") and hovered_slot.custom_tooltip != "":
+		tooltip_label.text = hovered_slot.custom_tooltip
+		tooltip_panel.visible = true
+	else:
+		tooltip_panel.visible = false
 
 func setup(player):
 	inventory_ref = player.inventory
@@ -83,10 +166,10 @@ func setup(player):
 		state.gamemode_changed.connect(_on_gamemode_changed)
 	
 	# Clear existing if any
-	for child in hotbar_container.get_children(): child.queue_free()
-	for child in main_inventory_grid.get_children(): child.queue_free()
+	for child in hotbar_container.get_children(): child.free()
+	for child in main_inventory_grid.get_children(): child.free()
 	if main_hotbar_grid:
-		for child in main_hotbar_grid.get_children(): child.queue_free()
+		for child in main_hotbar_grid.get_children(): child.free()
 	
 	# Create Hotbar slots (the one at the bottom of the screen)
 	for i in range(inventory_ref.HOTBAR_SIZE):
@@ -96,7 +179,8 @@ func setup(player):
 		slot.slot_index = i
 		slot.is_hotbar_slot = true
 		slot.slot_clicked.connect(_on_slot_clicked)
-		slot.mouse_filter = Control.MOUSE_FILTER_PASS
+		slot.mouse_entered.connect(_on_slot_mouse_entered.bind(slot))
+		slot.mouse_exited.connect(_on_slot_mouse_exited.bind(slot))
 	
 	# Create Main Inventory slots
 	for i in range(inventory_ref.INVENTORY_SIZE):
@@ -106,7 +190,8 @@ func setup(player):
 		slot.slot_index = i
 		slot.is_hotbar_slot = false
 		slot.slot_clicked.connect(_on_slot_clicked)
-		slot.mouse_filter = Control.MOUSE_FILTER_PASS
+		slot.mouse_entered.connect(_on_slot_mouse_entered.bind(slot))
+		slot.mouse_exited.connect(_on_slot_mouse_exited.bind(slot))
 		
 	# Create Main Hotbar slots (the one inside the inventory panel)
 	if main_hotbar_grid:
@@ -117,7 +202,8 @@ func setup(player):
 			slot.slot_index = i
 			slot.is_hotbar_slot = true
 			slot.slot_clicked.connect(_on_slot_clicked)
-			slot.mouse_filter = Control.MOUSE_FILTER_PASS
+			slot.mouse_entered.connect(_on_slot_mouse_entered.bind(slot))
+			slot.mouse_exited.connect(_on_slot_mouse_exited.bind(slot))
 
 	update_ui()
 	update_health(player.health)
@@ -266,6 +352,8 @@ func update_ui():
 		f_label.add_theme_constant_override("outline_size", 4)
 		
 		floating_item_ui.get_node("Icon").texture = block_textures.get(holding_item.type)
+		floating_item_ui.get_node("Icon").visible = true
+			
 		f_label.text = str(holding_item.count) if holding_item.count > 1 else ""
 		floating_item_ui.visible = true
 	else:
@@ -302,10 +390,13 @@ func _update_slot_visual(slot_ui, data):
 	if data:
 		icon.texture = block_textures.get(data.type)
 		icon.visible = true
+			
 		label.text = str(data.count) if data.count > 1 else ""
+		slot_ui.custom_tooltip = block_names.get(data.type, "Unknown Block")
 	else:
 		icon.visible = false
 		label.text = ""
+		slot_ui.custom_tooltip = ""
 
 func _setup_creative_inventory():
 	if not creative_grid: return
@@ -315,7 +406,7 @@ func _setup_creative_inventory():
 		child.queue_free()
 		
 	# All solid blocks
-	var blocks = [0, 1, 2, 3, 4, 5, 6, 7]
+	var blocks = [0, 1, 2, 3, 4, 5, 6, 9]
 	
 	for type in blocks:
 		var slot = slot_scene.instantiate()
@@ -323,6 +414,8 @@ func _setup_creative_inventory():
 		slot.custom_minimum_size = Vector2(48, 48)
 		slot.slot_index = type
 		slot.slot_clicked.connect(_on_creative_slot_clicked)
+		slot.mouse_entered.connect(_on_slot_mouse_entered.bind(slot))
+		slot.mouse_exited.connect(_on_slot_mouse_exited.bind(slot))
 		_update_slot_visual(slot, {"type": type, "count": 1})
 		slot.get_node("CountLabel").text = "" # Hide count in creative menu
 
@@ -330,6 +423,17 @@ func _on_creative_slot_clicked(type, _is_hotbar, _is_right_click):
 	# In creative, clicking gives you a full stack
 	holding_item = {"type": type, "count": inventory_ref.MAX_STACK}
 	update_ui()
+
+func _on_trash_slot_clicked(_index, _is_hotbar, _is_right_click):
+	if Input.is_key_pressed(KEY_SHIFT):
+		if inventory_ref:
+			inventory_ref.clear()
+			holding_item = null
+			update_ui()
+	else:
+		if holding_item:
+			holding_item = null
+			update_ui()
 
 func set_selected(index):
 	selected_slot = index
@@ -340,15 +444,12 @@ func toggle_inventory():
 	
 	var state = get_node_or_null("/root/GameState")
 	var is_creative = state and state.gamemode == state.GameMode.CREATIVE
-	
-	# Toggle creative tab accessibility
-	tabs.set_tab_disabled(1, not is_creative)
-	if is_creative:
-		tabs.current_tab = 1
-	else:
-		tabs.current_tab = 0
 
 	if main_inventory_panel.visible:
+		# Ensure correct tab is selected when opening
+		tabs.set_tab_disabled(1, not is_creative)
+		tabs.current_tab = 0 # Always default to Inventory tab
+			
 		Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 		mouse_filter = Control.MOUSE_FILTER_STOP
 		$HotbarPanel.mouse_filter = Control.MOUSE_FILTER_STOP

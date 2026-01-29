@@ -1,12 +1,48 @@
 extends Node
 
 var world_seed = "GodotCraft"
-var render_distance = 4
-var borderless_fullscreen = false
+var render_distance = 4:
+	set(value):
+		render_distance = value
+		settings_changed.emit()
+
+var borderless_fullscreen = false:
+	set(value):
+		borderless_fullscreen = value
+		_apply_graphics_settings()
+		settings_changed.emit()
+
+var msaa = 0: # 0: Disabled, 1: 2x, 2: 4x, 3: 8x
+	set(value):
+		msaa = value
+		_apply_graphics_settings()
+		settings_changed.emit()
+
+var vsync = true:
+	set(value):
+		vsync = value
+		_apply_graphics_settings()
+		settings_changed.emit()
+
+var shadow_quality = 2: # 0: Off, 1: Low, 2: Medium, 3: High, 4: Ultra
+	set(value):
+		shadow_quality = value
+		_apply_graphics_settings()
+		settings_changed.emit()
+
 var current_save_name = ""
-var fov = 75.0
+
+var fov = 75.0:
+	set(value):
+		fov = value
+		settings_changed.emit()
+
 var username = "Player"
-var is_slim = false
+var is_slim = false:
+	set(value):
+		is_slim = value
+		settings_changed.emit()
+
 var custom_texture_path = ""
 
 enum GameMode { SURVIVAL, CREATIVE }
@@ -21,7 +57,7 @@ signal gamemode_changed(new_mode)
 var rules = {
 	"drop_items": true
 }
-var ops = ["Player"] # Default op for simplicity in single player
+var ops = [] # No default ops
 
 signal settings_changed
 
@@ -46,6 +82,9 @@ func save_settings():
 	config.set_value("Game", "username", username)
 	config.set_value("Graphics", "render_distance", render_distance)
 	config.set_value("Graphics", "borderless_fullscreen", borderless_fullscreen)
+	config.set_value("Graphics", "msaa", msaa)
+	config.set_value("Graphics", "vsync", vsync)
+	config.set_value("Graphics", "shadow_quality", shadow_quality)
 	config.set_value("Graphics", "fov", fov)
 	config.set_value("Player", "is_slim", is_slim)
 	config.set_value("Player", "custom_texture_path", custom_texture_path)
@@ -59,6 +98,9 @@ func load_settings():
 		username = config.get_value("Game", "username", "Player")
 		render_distance = config.get_value("Graphics", "render_distance", 4)
 		borderless_fullscreen = config.get_value("Graphics", "borderless_fullscreen", false)
+		msaa = config.get_value("Graphics", "msaa", 0)
+		vsync = config.get_value("Graphics", "vsync", true)
+		shadow_quality = config.get_value("Graphics", "shadow_quality", 2)
 		fov = config.get_value("Graphics", "fov", 75.0)
 		is_slim = config.get_value("Player", "is_slim", false)
 		custom_texture_path = config.get_value("Player", "custom_texture_path", "")
@@ -66,11 +108,44 @@ func load_settings():
 	_apply_graphics_settings()
 
 func _apply_graphics_settings():
-	print("Applying graphics settings: Fullscreen =", borderless_fullscreen)
+	print("Applying graphics settings")
 	if borderless_fullscreen:
 		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
 	else:
 		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+		
+	# Apply VSync
+	if vsync:
+		DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_ENABLED)
+	else:
+		DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
+		
+	# Apply MSAA (This applies to the main viewport)
+	var msaa_value = Viewport.MSAA_DISABLED
+	match msaa:
+		1: msaa_value = Viewport.MSAA_2X
+		2: msaa_value = Viewport.MSAA_4X
+		3: msaa_value = Viewport.MSAA_8X
+	get_viewport().msaa_3d = msaa_value
+	
+	# Apply global shadow quality
+	match shadow_quality:
+		0: pass
+		1: # Low
+			RenderingServer.positional_soft_shadow_filter_set_quality(1 as RenderingServer.ShadowQuality)
+			RenderingServer.directional_soft_shadow_filter_set_quality(1 as RenderingServer.ShadowQuality)
+		2: # Medium
+			RenderingServer.positional_soft_shadow_filter_set_quality(2 as RenderingServer.ShadowQuality)
+			RenderingServer.directional_soft_shadow_filter_set_quality(2 as RenderingServer.ShadowQuality)
+		3: # High
+			RenderingServer.positional_soft_shadow_filter_set_quality(3 as RenderingServer.ShadowQuality)
+			RenderingServer.directional_soft_shadow_filter_set_quality(3 as RenderingServer.ShadowQuality)
+		4: # Ultra
+			RenderingServer.positional_soft_shadow_filter_set_quality(4 as RenderingServer.ShadowQuality)
+			RenderingServer.directional_soft_shadow_filter_set_quality(4 as RenderingServer.ShadowQuality)
+	
+	# Shadows are applied by the World scene when it detects change or on ready
+	settings_changed.emit()
 
 func get_save_list():
 	var saves = []

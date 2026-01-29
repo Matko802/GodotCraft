@@ -57,8 +57,7 @@ func spawn_dropped_item(type: int, count: int, pos: Vector3, world: Node, custom
 	item.type = type
 	item.count = count
 	world.add_child(item)
-	# Center the item in the block (0.5 on all axes)
-	item.global_position = pos + Vector3(0.5, 0.5, 0.5)
+	item.global_position = pos
 	
 	if custom_vel != Vector3.ZERO:
 		item.velocity = custom_vel
@@ -69,43 +68,55 @@ func spawn_dropped_item(type: int, count: int, pos: Vector3, world: Node, custom
 	return item
 
 func add_item(type, count = 1):
-	if type < 0: return false # Don't add air blocks
+	if type < 0: return 0 # Don't add air blocks
+	
+	var remaining = count
 	
 	# Try to stack in hotbar first
 	for i in range(HOTBAR_SIZE):
 		if hotbar[i] and hotbar[i].type == type and hotbar[i].count < MAX_STACK:
-			var add = min(count, MAX_STACK - hotbar[i].count)
+			var add = min(remaining, MAX_STACK - hotbar[i].count)
 			hotbar[i].count += add
-			count -= add
-			if count <= 0:
+			remaining -= add
+			if remaining <= 0:
 				inventory_changed.emit()
-				return true
+				return count
 				
 	# Try to stack in inventory
 	for i in range(INVENTORY_SIZE):
 		if inventory[i] and inventory[i].type == type and inventory[i].count < MAX_STACK:
-			var add = min(count, MAX_STACK - inventory[i].count)
+			var add = min(remaining, MAX_STACK - inventory[i].count)
 			inventory[i].count += add
-			count -= add
-			if count <= 0:
+			remaining -= add
+			if remaining <= 0:
 				inventory_changed.emit()
-				return true
+				return count
 				
 	# Try empty hotbar slots
 	for i in range(HOTBAR_SIZE):
 		if hotbar[i] == null:
-			hotbar[i] = {"type": type, "count": count}
-			inventory_changed.emit()
-			return true
+			var add = min(remaining, MAX_STACK)
+			hotbar[i] = {"type": type, "count": add}
+			remaining -= add
+			if remaining <= 0:
+				inventory_changed.emit()
+				return count
 			
 	# Try empty inventory slots
 	for i in range(INVENTORY_SIZE):
 		if inventory[i] == null:
-			inventory[i] = {"type": type, "count": count}
-			inventory_changed.emit()
-			return true
+			var add = min(remaining, MAX_STACK)
+			inventory[i] = {"type": type, "count": add}
+			remaining -= add
+			if remaining <= 0:
+				inventory_changed.emit()
+				return count
 			
-	return false # Full
+	if remaining < count:
+		inventory_changed.emit()
+		return count - remaining
+		
+	return 0 # Full
 
 func can_add_item(type: int, count: int = 1) -> bool:
 	if type < 0: return false

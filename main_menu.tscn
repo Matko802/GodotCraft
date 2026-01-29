@@ -229,6 +229,38 @@ text = "Custom Texture Path: 	"
 layout_mode = 2
 size_flags_horizontal = 3
 
+[node name="VSyncHBox" type="HBoxContainer" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList"]
+layout_mode = 2
+
+[node name="VSyncLabelUI" type="Label" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList/VSyncHBox"]
+layout_mode = 2
+text = "VSync:"
+
+[node name="VSyncCheckBoxUI" type="CheckBox" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList/VSyncHBox"]
+layout_mode = 2
+
+[node name="ShadowsHBox" type="HBoxContainer" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList"]
+layout_mode = 2
+
+[node name="ShadowsLabelUI" type="Label" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList/ShadowsHBox"]
+layout_mode = 2
+text = "Shadows:"
+
+[node name="ShadowsSliderUI" type="HSlider" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList/ShadowsHBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+max_value = 4.0
+
+[node name="MSAAHBox" type="HBoxContainer" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList"]
+layout_mode = 2
+
+[node name="MSAALabelUI" type="Label" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList/MSAAHBox"]
+layout_mode = 2
+text = "Anti-Aliasing:"
+
+[node name="MSAAOptionButtonUI" type="OptionButton" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList/MSAAHBox"]
+layout_mode = 2
+
 [node name="SettingsBackButtonUI" type="Button" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer"]
 layout_mode = 2
 text = "Back"

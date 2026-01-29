@@ -8,11 +8,15 @@
 
 config_version=5
 
+[animation]
+
+compatibility/default_parent_skeleton_in_mesh_instance_3d=true
+
 [application]
 
 config/name="GodotCraft"
 run/main_scene="res://main_menu.tscn"
-config/features=PackedStringArray("4.5", "GL Compatibility")
+config/features=PackedStringArray("4.6", "GL Compatibility")
 config/icon="res://icon.svg"
 
 [autoload]
@@ -25,19 +29,13 @@ window/size/viewport_width=1152.0
 window/size/viewport_height=648.0
 window/stretch/aspect="ignore"
 
-[editor_plugins]
+[gui]
 
-enabled=PackedStringArray()
+timers/tooltip_delay_sec=0.0
 
-[input]
+[input_devices]
 
-move_left="{\"deadzone\": 0.5, \"events\": [{\"resource_type\": \"InputEventKey\", \"physical_keycode\": 65}]}"
-move_right="{\"deadzone\":0.5,\"events\":[{\"resource_type\":\"InputEventKey\",\"physical_keycode\":68}]}"
-move_forward="{\"deadzone\":0.5,\"events\":[{\"resource_type\":\"InputEventKey\",\"physical_keycode\":87}]}"
-move_back="{\"deadzone\":0.5,\"events\":[{\"resource_type\":\"InputEventKey\",\"physical_keycode\":83}]}"
-click_left="{\"deadzone\": 0.5, \"events\": [{\"device\": -1, \"button_index\": 1, \"pressure\": 0.0, \"pressed\": true, \"class_name\": \"InputEventMouseButton\"}]}"
-click_right="{\"deadzone\": 0.5, \"events\": [{\"device\": -1, \"button_index\": 2, \"pressure\": 0.0, \"pressed\": true, \"class_name\": \"InputEventMouseButton\"}]}"
-inventory="{\"deadzone\": 0.5, \"events\": [{\"resource_type\": \"InputEventKey\", \"physical_keycode\": 69}]}"
+pointing/emulate_touch_from_mouse=true
 
 [plugins]
 
@@ -52,3 +50,5 @@ renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
 textures/vram_compression/import_s3tc_bptc=true
 textures/vram_compression/import_etc2_astc=true
+shadows/directional_shadow/size=4096.0
+shadows/directional_shadow/soft_shadow_filter_quality=3.0

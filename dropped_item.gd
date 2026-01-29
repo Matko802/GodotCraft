@@ -25,6 +25,16 @@ var block_textures = {
 
 func _ready():
 	add_to_group("dropped_items")
+	
+	if type == 9: # Torch
+		var world = get_tree().get_first_node_in_group("world")
+		if world and world.torch_mesh:
+			mesh_instance.mesh = world.torch_mesh
+			mesh_instance.material_override = world.torch_material
+			mesh_instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			mesh_instance.scale = Vector3.ONE * 0.6
+		return
+
 	# Construct a perfect mini-block using the same logic as the world
 	var mesh = ArrayMesh.new()
 	var st = SurfaceTool.new()
@@ -111,7 +121,7 @@ func _process(delta):
 		if world:
 			var current_block_pos = Vector3i(floor(global_position.x), floor(global_position.y), floor(global_position.z))
 			var block_type = world.get_block(current_block_pos)
-			if block_type >= 0 and block_type != 7 and block_type != 8: # Not air or water
+			if block_type >= 0 and block_type != 7 and block_type != 8 and block_type != 9: # Not air, water, or torch
 				global_position.y = ceil(global_position.y) + 0.1
 				velocity.y = 0
 				resting = true
@@ -146,7 +156,7 @@ func _process(delta):
 	if not resting and world:
 		var feet_pos = Vector3i(floor(global_position.x), floor(global_position.y), floor(global_position.z))
 		var feet_block = world.get_block(feet_pos)
-		if feet_block >= 0 and feet_block != 7 and feet_block != 8:
+		if feet_block >= 0 and feet_block != 7 and feet_block != 8 and feet_block != 9:
 			global_position.y = ceil(global_position.y) + 0.05
 			velocity.y = 0
 			resting = true
@@ -168,10 +178,13 @@ func _process(delta):
 			var dist = global_position.distance_to(target_pos)
 			
 			if dist < 0.3: # Collection threshold
-				if player.inventory.add_item(type, count):
+				var added = player.inventory.add_item(type, count)
+				if added > 0:
 					_play_pickup_sound()
-					queue_free()
-					return
+					count -= added
+					if count <= 0:
+						queue_free()
+						return
 			elif dist < 3.5: # Attraction range
 				being_picked_up = true
 				target_player = player

@@ -10,6 +10,9 @@ signal chat_active(is_active)
 var history = []
 var history_index = -1
 var current_input_backup = ""
+var selected_suggestion_index = -1
+
+const HISTORY_FILE = "user://chat_history.txt"
 
 var commands = ["/op", "/deop", "/rule", "/help", "/tp", "/gamemode", "/spawn", "/ops", "/time", "/kill"]
 var rules_list = ["dropitems"]
@@ -18,6 +21,7 @@ var fade_timer = 0.0
 const FADE_TIME = 5.0 # Seconds before messages start to fade
 
 func _ready():
+	_load_history()
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	visible = true # Parent PanelContainer always visible to show ChatDisplay
 	# But hide background until chat is opened
@@ -84,6 +88,8 @@ func _on_input_text_changed(new_text):
 	# Clear existing
 	for child in suggestions_list.get_children():
 		child.queue_free()
+	
+	selected_suggestion_index = -1
 
 	if not new_text.begins_with("/"):
 		suggestions_panel.visible = false
@@ -95,7 +101,9 @@ func _on_input_text_changed(new_text):
 	
 	if parts.size() == 1:
 		# Suggesting the command itself
-		for c in commands:
+		var sorted_cmds = commands.duplicate()
+		sorted_cmds.sort()
+		for c in sorted_cmds:
 			if cmd_part == "" or c.substr(1).begins_with(cmd_part):
 				suggested.append(c)
 	elif parts.size() >= 2:
@@ -113,7 +121,7 @@ func _on_input_text_changed(new_text):
 		elif cmd_part == "op" or cmd_part == "deop":
 			var name_part = parts[1].to_lower()
 			# In a real game we'd get all online players
-			var players = ["Player"] 
+			var players = [] 
 			var state = get_node_or_null("/root/GameState")
 			if state:
 				if not state.username in players: players.append(state.username)
@@ -128,7 +136,7 @@ func _on_input_text_changed(new_text):
 					suggested.append(c.substr(1))
 		elif cmd_part == "kill":
 			var name_part = parts[1].to_lower()
-			var players = ["self", "Player"]
+			var players = ["self"]
 			var state = get_node_or_null("/root/GameState")
 			if state:
 				if not state.username in players: players.append(state.username)
@@ -154,8 +162,14 @@ func _on_input_gui_input(event):
 	if event is InputEventKey and event.pressed:
 		if event.keycode == KEY_TAB:
 			if suggestions_panel.visible and suggestions_list.get_child_count() > 0:
-				var first_btn = suggestions_list.get_child(0)
-				_apply_suggestion(first_btn.text)
+				selected_suggestion_index = (selected_suggestion_index + 1) % suggestions_list.get_child_count()
+				_update_suggestion_visuals()
+				get_viewport().set_input_as_handled()
+		elif event.keycode == KEY_SPACE:
+			if suggestions_panel.visible and suggestions_list.get_child_count() > 0:
+				var idx = selected_suggestion_index if selected_suggestion_index != -1 else 0
+				var btn = suggestions_list.get_child(idx)
+				_apply_suggestion(btn.text)
 				get_viewport().set_input_as_handled()
 		elif event.keycode == KEY_UP:
 			if history.size() > 0:
@@ -175,6 +189,18 @@ func _on_input_gui_input(event):
 					input.text = history[history.size() - 1 - history_index]
 				input.caret_column = input.text.length()
 				get_viewport().set_input_as_handled()
+
+func _update_suggestion_visuals():
+	for i in range(suggestions_list.get_child_count()):
+		var btn = suggestions_list.get_child(i)
+		if i == selected_suggestion_index:
+			btn.add_theme_color_override("font_color", Color.WHITE)
+			var style = StyleBoxFlat.new()
+			style.bg_color = Color(0.3, 0.3, 0.3)
+			btn.add_theme_stylebox_override("normal", style)
+		else:
+			btn.add_theme_color_override("font_color", Color(0.9, 0.9, 0.3))
+			btn.remove_theme_stylebox_override("normal")
 
 func _apply_suggestion(suggestion: String):
 	var text = input.text
@@ -225,9 +251,12 @@ func close_chat():
 
 func _on_text_submitted(new_text):
 	if new_text.strip_edges() != "":
-		history.append(new_text)
-		if history.size() > 50:
-			history.pop_front()
+		# Add to history if not the same as last message
+		if history.is_empty() or history[history.size()-1] != new_text:
+			history.append(new_text)
+			if history.size() > 100:
+				history.pop_front()
+			_save_history()
 		
 		var user = "Player"
 		var state = get_node_or_null("/root/GameState")
@@ -239,6 +268,24 @@ func _on_text_submitted(new_text):
 		else:
 			add_message("[color=white]<" + user + "> " + new_text + "[/color]")
 	close_chat()
+
+func _save_history():
+	var file = FileAccess.open(HISTORY_FILE, FileAccess.WRITE)
+	if file:
+		for line in history:
+			file.store_line(line)
+
+func _load_history():
+	if FileAccess.file_exists(HISTORY_FILE):
+		var file = FileAccess.open(HISTORY_FILE, FileAccess.READ)
+		if file:
+			history.clear()
+			while not file.eof_reached():
+				var line = file.get_line().strip_edges()
+				if line != "":
+					history.append(line)
+			if history.size() > 100:
+				history = history.slice(-100)
 
 func _handle_command(command_text: String, user: String, state: Node):
 	var parts = command_text.substr(1).split(" ")

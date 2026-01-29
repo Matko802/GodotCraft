@@ -10,26 +10,30 @@ extends Control
 @onready var quit_button = $MainScreen/MenuPanel/MenuMargin/VBoxContainer/QuitButton
 
 # Play Screen Elements
-@onready var world_name_input = find_child("NameInputUI", true)
-@onready var seed_input = find_child("SeedInputUI", true)
-@onready var create_button = find_child("CreateButtonUI", true)
-@onready var save_list = find_child("SaveListUI", true)
-@onready var load_button = find_child("LoadButtonUI", true)
-@onready var delete_button = find_child("DeleteButtonUI", true)
-@onready var thumbnail_ui = find_child("ThumbnailUI", true)
-@onready var info_label = find_child("WorldInfoLabel", true)
-@onready var play_back_button = find_child("PlayBackButton", true)
+@onready var world_name_input = find_child("NameInputUI", true) as LineEdit
+@onready var seed_input = find_child("SeedInputUI", true) as LineEdit
+@onready var create_button = find_child("CreateButtonUI", true) as Button
+@onready var save_list = find_child("SaveListUI", true) as ItemList
+@onready var load_button = find_child("LoadButtonUI", true) as Button
+@onready var delete_button = find_child("DeleteButtonUI", true) as Button
+@onready var thumbnail_ui = find_child("ThumbnailUI", true) as TextureRect
+@onready var info_label = find_child("WorldInfoLabel", true) as Label
+@onready var play_back_button = find_child("PlayBackButton", true) as Button
 
 # Settings Screen Elements
-@onready var render_distance_slider = find_child("RenderDistanceSliderUI", true)
-@onready var render_distance_label = find_child("RenderDistanceLabelUI", true)
-@onready var fov_slider = find_child("FOVSliderUI", true)
-@onready var fov_label = find_child("FOVLabelUI", true)
-@onready var fullscreen_checkbox = find_child("FullscreenCheckBoxUI", true)
-@onready var slim_checkbox = find_child("SlimModelCheckBoxUI", true)
-@onready var custom_texture_input = find_child("CustomTextureInputUI", true)
-@onready var username_input = find_child("UsernameInputUI", true)
-@onready var settings_back_button = find_child("SettingsBackButtonUI", true)
+@onready var render_distance_slider = find_child("RenderDistanceSliderUI", true) as HSlider
+@onready var render_distance_label = find_child("RenderDistanceLabelUI", true) as Label
+@onready var fov_slider = find_child("FOVSliderUI", true) as HSlider
+@onready var fov_label = find_child("FOVLabelUI", true) as Label
+@onready var fullscreen_checkbox = find_child("FullscreenCheckBoxUI", true) as CheckBox
+@onready var vsync_checkbox = find_child("VSyncCheckBoxUI", true) as CheckBox
+@onready var shadows_slider = find_child("ShadowsSliderUI", true) as HSlider
+@onready var shadows_label = find_child("ShadowsLabelUI", true) as Label
+@onready var msaa_button = find_child("MSAAOptionButtonUI", true) as OptionButton
+@onready var slim_checkbox = find_child("SlimModelCheckBoxUI", true) as CheckBox
+@onready var custom_texture_input = find_child("CustomTextureInputUI", true) as LineEdit
+@onready var username_input = find_child("UsernameInputUI", true) as LineEdit
+@onready var settings_back_button = find_child("SettingsBackButtonUI", true) as Button
 
 var selected_save_index = -1
 
@@ -56,6 +60,16 @@ func _ready():
 	render_distance_slider.value_changed.connect(_on_render_distance_changed)
 	fov_slider.value_changed.connect(_on_fov_changed)
 	fullscreen_checkbox.toggled.connect(_on_fullscreen_toggled)
+	vsync_checkbox.toggled.connect(_on_vsync_toggled)
+	shadows_slider.value_changed.connect(_on_shadows_changed)
+	
+	msaa_button.clear()
+	msaa_button.add_item("Disabled", 0)
+	msaa_button.add_item("2x", 1)
+	msaa_button.add_item("4x", 2)
+	msaa_button.add_item("8x", 3)
+	msaa_button.item_selected.connect(_on_msaa_selected)
+	
 	slim_checkbox.toggled.connect(_on_slim_toggled)
 	custom_texture_input.text_changed.connect(_on_custom_texture_changed)
 	username_input.text_changed.connect(_on_username_changed)
@@ -75,6 +89,10 @@ func _ready():
 		fov_slider.value = state.fov
 		fov_label.text = "FOV: %d" % state.fov
 		fullscreen_checkbox.button_pressed = state.borderless_fullscreen
+		vsync_checkbox.button_pressed = state.vsync
+		shadows_slider.value = state.shadow_quality
+		_update_shadows_label(state.shadow_quality)
+		msaa_button.selected = state.msaa
 		slim_checkbox.button_pressed = state.is_slim
 		custom_texture_input.text = state.custom_texture_path
 		username_input.text = state.username
@@ -116,8 +134,42 @@ func _on_external_settings_changed():
 	var state = get_node_or_null("/root/GameState")
 	if state:
 		fullscreen_checkbox.button_pressed = state.borderless_fullscreen
+		vsync_checkbox.button_pressed = state.vsync
+		shadows_slider.value = state.shadow_quality
+		_update_shadows_label(state.shadow_quality)
+		msaa_button.selected = state.msaa
 		render_distance_slider.value = state.render_distance
 		fov_slider.value = state.fov
+
+func _on_vsync_toggled(toggled_on):
+	var state = get_node_or_null("/root/GameState")
+	if state:
+		state.vsync = toggled_on
+		state.save_settings()
+		state._apply_graphics_settings()
+
+func _on_shadows_changed(value):
+	var state = get_node_or_null("/root/GameState")
+	if state:
+		state.shadow_quality = int(value)
+		state.save_settings()
+		_update_shadows_label(state.shadow_quality)
+
+func _update_shadows_label(value):
+	var text = "Off"
+	match int(value):
+		1: text = "Low"
+		2: text = "Medium"
+		3: text = "High"
+		4: text = "Ultra"
+	shadows_label.text = "Shadows: " + text
+
+func _on_msaa_selected(index):
+	var state = get_node_or_null("/root/GameState")
+	if state:
+		state.msaa = index
+		state.save_settings()
+		state._apply_graphics_settings()
 
 func refresh_save_list():
 	save_list.clear()
@@ -167,11 +219,14 @@ func _on_create_pressed():
 	if state:
 		state.current_save_name = world_name
 		state.world_seed = seed_str
+		state.gamemode = state.GameMode.SURVIVAL # Default to survival
 		var data = {
 			"seed": seed_str,
 			"world_data": {},
 			"player_pos": Vector3(8, 40, 8),
-			"player_rot": Vector3.ZERO
+			"player_rot": Vector3.ZERO,
+			"gamemode": state.GameMode.SURVIVAL,
+			"ops": []
 		}
 		state.save_game(world_name, data)
 		state.save_settings()

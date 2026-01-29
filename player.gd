@@ -10,7 +10,7 @@ const MOUSE_SENSITIVITY = 0.002
 
 @onready var camera = $SpringArm3D/Camera3D
 @onready var spring_arm = $SpringArm3D
-@onready var raycast = $SpringArm3D/Camera3D/RayCast3D
+@onready var raycast = $RayCastPivot/RayCast3D
 @onready var inventory = $Inventory
 @onready var inventory_ui = $HUD/InventoryUI
 @onready var chat_ui = $HUD/ChatUI
@@ -18,14 +18,19 @@ const MOUSE_SENSITIVITY = 0.002
 @onready var pause_menu = $PauseLayer/PauseMenu
 @onready var player_model = $PlayerModel
 
-@onready var view_model_arm = $SpringArm3D/Camera3D/ViewModelArm
-@onready var slim_hand = $SpringArm3D/Camera3D/ViewModelArm/SlimHandModel
-@onready var wide_hand = $SpringArm3D/Camera3D/ViewModelArm/WideHandModel
-@onready var held_item_mesh = $SpringArm3D/Camera3D/ViewModelArm/HeldItemRoot/HeldItemMesh
+@onready var view_model_camera = $ViewModelLayer/ViewModelContainer/SubViewport/ViewModelCamera
+@onready var view_model_arm = $ViewModelLayer/ViewModelContainer/SubViewport/ViewModelCamera/ViewModelArm
+@onready var slim_hand = $ViewModelLayer/ViewModelContainer/SubViewport/ViewModelCamera/ViewModelArm/SlimHandModel
+@onready var wide_hand = $ViewModelLayer/ViewModelContainer/SubViewport/ViewModelCamera/ViewModelArm/WideHandModel
+@onready var held_item_mesh = $ViewModelLayer/ViewModelContainer/SubViewport/ViewModelCamera/ViewModelArm/HeldItemRoot/HeldItemMesh
+@onready var held_torch_root = $ViewModelLayer/ViewModelContainer/SubViewport/ViewModelCamera/ViewModelArm/HeldTorchRoot
+@onready var hand_torch_mesh = $ViewModelLayer/ViewModelContainer/SubViewport/ViewModelCamera/ViewModelArm/HeldTorchRoot/HandTorchMesh
 @onready var view_model_anim = $ViewModelAnimationPlayer
 
 @onready var tp_held_item_mesh = $TPHeldItemRoot/TPHeldItemMesh
 @onready var tp_held_item_root = $TPHeldItemRoot
+@onready var tp_held_torch_root = $TPHeldTorchRoot
+@onready var tp_held_torch_mesh = $TPHeldTorchRoot/TPHeldTorchMesh
 
 @onready var right_arm = $PlayerModel/Waist/"Right Arm2"
 @onready var left_arm = $PlayerModel/Waist/"Left Arm2"
@@ -33,11 +38,16 @@ const MOUSE_SENSITIVITY = 0.002
 @onready var left_leg = $"PlayerModel/Left Leg2"
 
 var walk_time = 0.0
+var idle_time = 0.0
 var is_swinging = false
 var swing_progress = 0.0
 const SWING_SPEED = 8.0
 
+var _hand_light_ref: OmniLight3D = null
+var _viewmodel_light_ref: OmniLight3D = null
+
 @onready var head_node = null
+@onready var raycast_pivot = $RayCastPivot
 
 signal health_changed(new_health)
 
@@ -95,6 +105,9 @@ func _play_damage_sound():
 enum CameraMode { FIRST_PERSON, THIRD_PERSON_BACK, THIRD_PERSON_FRONT }
 var current_camera_mode = CameraMode.FIRST_PERSON
 
+var view_model_base_pos = Vector3.ZERO
+var view_model_base_rot = Vector3.ZERO
+
 func _die():
 	var state = get_node_or_null("/root/GameState")
 	var drop_items = true
@@ -129,59 +142,65 @@ var _void_damage_timer = 0.0
 var _last_jump_press_time = -1.0
 const DOUBLE_TAP_TIME = 0.3
 
-@onready var raycast_pivot: Node3D = null
-
 func _ready():
 	add_to_group("player")
 	collision_layer = 2 # Player on layer 2
 	collision_mask = 1  # Collide with world (layer 1)
+	
+	# Raycast should hit World (1) and Decos (4) -> Mask 5
+	raycast.collision_mask = 5
+	
+	_setup_input_map()
+	
 	print("Player ready. World: ", get_parent().name)
 	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 	world = get_parent()
 	
 	_setup_selection_box()
 	_setup_player_model()
-	
-	if inventory_ui:
-		inventory_ui.setup(self)
-	
 	_setup_view_model()
-	_update_view_model()
-	
-	if inventory:
-		if not inventory.inventory_changed.is_connected(_update_held_item_mesh):
-			inventory.inventory_changed.connect(_update_held_item_mesh)
-	
-	# Create a RayCast pivot at eye level that doesn't move with the SpringArm's spring
-	raycast_pivot = Node3D.new()
-	raycast_pivot.name = "RayCastPivot"
-	add_child(raycast_pivot)
-	raycast_pivot.position = Vector3(0, 0.7, 0) # Eye level
-	
-	raycast.reparent(raycast_pivot)
-	raycast.position = Vector3.ZERO
-	raycast.rotation = Vector3.ZERO
-	raycast.add_exception(self)
-	# Set RayCast mask to only hit the world (layer 1)
-	raycast.collision_mask = 1
-	
-	# Ensure SpringArm ignores the player
-	spring_arm.add_excluded_object(get_rid())
-	
-	_update_camera_mode()
-	_apply_rotations()
 	
 	var state = get_node_or_null("/root/GameState")
 	if state:
 		state.settings_changed.connect(_on_settings_changed)
-		state.gamemode_changed.connect(_on_gamemode_changed)
-		_on_settings_changed() # Initialize FOV
+		_on_settings_changed()
+	
+	if inventory_ui:
+		inventory_ui.setup(self)
+	
+	inventory.inventory_changed.connect(_update_held_item_mesh)
 
-func _on_gamemode_changed(_new_mode):
-	health_changed.emit(health)
-	_update_held_item_mesh()
-	if _new_mode == 0: # SURVIVAL
-		is_flying = false
+func _setup_input_map():
+	var actions = {
+		"move_forward": [KEY_W],
+		"move_back": [KEY_S],
+		"move_left": [KEY_A],
+		"move_right": [KEY_D],
+		"jump": [KEY_SPACE],
+		"sneak": [KEY_SHIFT],
+		"inventory": [KEY_E],
+		"drop": [KEY_Q],
+		"chat": [KEY_T, KEY_ENTER],
+		"attack": [MOUSE_BUTTON_LEFT],
+		"interact": [MOUSE_BUTTON_RIGHT],
+		"camera_toggle": [KEY_F5]
+	}
+	
+	for action in actions:
+		if not InputMap.has_action(action):
+			InputMap.add_action(action)
+		else:
+			InputMap.action_erase_events(action)
+			
+		for key in actions[action]:
+			var ev
+			if key is int and key < 10: # Mouse buttons
+				ev = InputEventMouseButton.new()
+				ev.button_index = key
+			else:
+				ev = InputEventKey.new()
+				ev.keycode = key
+			InputMap.action_add_event(action, ev)
 
 var camera_pitch = 0.0
 
@@ -190,25 +209,19 @@ func _setup_player_model():
 	var is_slim = state.is_slim if state else false
 	var tex_path = state.custom_texture_path if state and state.custom_texture_path != "" else ("res://models/player/slim/model_0.png" if is_slim else "res://models/player/wide/model_0.png")
 	
-	# Find body parts for animation
-	right_arm = player_model.find_child("Right Arm2", true)
-	left_arm = player_model.find_child("Left Arm2", true)
-	right_leg = player_model.find_child("Right Leg2", true)
-	left_leg = player_model.find_child("Left Leg2", true)
-	
-	# Reset any inherited bone/part rotations to ensure they are straight
-	if right_arm: right_arm.quaternion = Quaternion.IDENTITY
-	if left_arm: left_arm.quaternion = Quaternion.IDENTITY
-	if right_leg: right_leg.quaternion = Quaternion.IDENTITY
-	if left_leg: left_leg.quaternion = Quaternion.IDENTITY
-
 	# Replace model if type changed
 	var model_path = "res://models/player/slim/model.gltf" if is_slim else "res://models/player/wide/model.gltf"
 	
-	# Use metadata or name check to ensure we don't duplicate
 	var current_path = player_model.scene_file_path
 	if current_path != model_path:
 		print("Swapping player model from ", current_path, " to ", model_path)
+		
+		# CRITICAL: Preserve attachment points before destroying old model
+		if tp_held_item_root and tp_held_item_root.get_parent() != self:
+			tp_held_item_root.reparent(self, true)
+		if tp_held_torch_root and tp_held_torch_root.get_parent() != self:
+			tp_held_torch_root.reparent(self, true)
+			
 		var new_model = load(model_path).instantiate()
 		new_model.name = "PlayerModel"
 		
@@ -218,43 +231,38 @@ func _setup_player_model():
 		var parent = player_model.get_parent()
 		parent.add_child(new_model)
 		
-		# Re-find body parts for animation BEFORE freeing old ones
-		right_arm = new_model.find_child("Right Arm2", true)
-		left_arm = new_model.find_child("Left Arm2", true)
-		right_leg = new_model.find_child("Right Leg2", true)
-		left_leg = new_model.find_child("Left Leg2", true)
-		var new_head = new_model.find_child("Head2", true)
-		if not new_head: new_head = new_model.find_child("Head", true)
-		
-		# Ensure we don't parent camera to a mesh that might be hidden
-		if new_head is MeshInstance3D:
-			var p = new_head.get_parent()
-			if p and not p is MeshInstance3D:
-				new_head = p
-		
-		# Update camera parent if it was on the old head
-		if head_node and camera.get_parent() == head_node:
-			camera.reparent(new_head)
-			camera.position = Vector3(0, 0, 0.1)
-			camera.rotation = Vector3.ZERO
-		
-		head_node = new_head
-		
 		# Clean up old model
 		player_model.queue_free()
 		player_model = new_model
-		
-		# Reset any inherited bone/part rotations
-		right_arm.rotation = Vector3.ZERO
-		left_arm.rotation = Vector3.ZERO
-		right_leg.rotation = Vector3.ZERO
-		left_leg.rotation = Vector3.ZERO
+
+	# Find body parts for animation with fallback
+	right_arm = player_model.find_child("Right Arm2", true)
+	if not right_arm: right_arm = player_model.find_child("Right Arm", true)
+	
+	left_arm = player_model.find_child("Left Arm2", true)
+	if not left_arm: left_arm = player_model.find_child("Left Arm", true)
+	
+	right_leg = player_model.find_child("Right Leg2", true)
+	if not right_leg: right_leg = player_model.find_child("Right Leg", true)
+	
+	left_leg = player_model.find_child("Left Leg2", true)
+	if not left_leg: left_leg = player_model.find_child("Left Leg", true)
+	
+	var new_head = player_model.find_child("Head2", true)
+	if not new_head: new_head = player_model.find_child("Head", true)
+	
+	if new_head and head_node != new_head:
+		head_node = new_head
 
 	# Setup Third Person held item attachment from scene
-	if right_arm and tp_held_item_root:
-		tp_held_item_root.reparent(right_arm)
-		# We no longer overwrite position/rotation here so editor changes persist
-		tp_held_item_mesh.scale = Vector3.ONE * 0.8 # Slightly smaller for TP
+	if right_arm:
+		if tp_held_item_root:
+			if tp_held_item_root.get_parent() != right_arm:
+				tp_held_item_root.reparent(right_arm, true)
+		
+		if tp_held_torch_root:
+			if tp_held_torch_root.get_parent() != right_arm:
+				tp_held_torch_root.reparent(right_arm, true)
 
 	# Apply texture
 	var texture = null
@@ -272,16 +280,26 @@ func _setup_player_model():
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
 	mat.alpha_scissor_threshold = 0.5
 	
-	for child in player_model.find_children("*", "MeshInstance3D"):
-		child.material_override = mat
+	# Ensure every visual part of the player model is on Layer 3
+	# This is critical so the held torch light (cull mask 1) can ignore it.
+	if player_model is VisualInstance3D:
+		player_model.layers = 4
+	for child in player_model.find_children("*", "VisualInstance3D", true):
+		child.layers = 4 # Layer 3
+		if child is MeshInstance3D:
+			child.material_override = mat
 	
-	# Final check on visibility
 	_update_camera_mode()
 
 func _on_settings_changed():
 	var state = get_node_or_null("/root/GameState")
 	if state:
 		camera.fov = state.fov
+		_update_light_shadows()
+
+func _update_light_shadows():
+	if not _hand_light_ref: return
+	_hand_light_ref.shadow_enabled = false # Held torch shadows are disabled as requested
 
 func _setup_selection_box():
 	selection_box = MeshInstance3D.new()
@@ -307,6 +325,8 @@ func _setup_selection_box():
 	# though typically in Minecraft it's depth tested.
 	mat.no_depth_test = false 
 	selection_box.material_override = mat
+	selection_box.layers = 4 # Layer 3 (Player)
+	selection_box.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(selection_box)
 	selection_box.top_level = true
 	selection_box.visible = false
@@ -317,10 +337,7 @@ func _setup_view_model():
 	var state = get_node_or_null("/root/GameState")
 	var is_slim = state.is_slim if state else false
 	
-	# Toggle hands based on slim setting
-	slim_hand.visible = is_slim
-	wide_hand.visible = not is_slim
-	
+	# Initial visibility handled by _update_held_item_mesh
 	# Setup Materials for hands
 	var tex_path = state.custom_texture_path if state and state.custom_texture_path != "" else ("res://models/player/slim/slimhand_0.png" if is_slim else "res://models/player/wide/widehand_0.png")
 	var texture = null
@@ -339,24 +356,152 @@ func _setup_view_model():
 	for hand in [slim_hand, wide_hand]:
 		for child in hand.find_children("*", "MeshInstance3D", true):
 			child.material_override = hand_mat
-			child.layers = 1 | 2
+			child.layers = 2
+			child.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 			
 	_update_held_item_mesh()
 
 func _update_held_item_mesh():
+	var state = get_node_or_null("/root/GameState")
+	var is_slim = state.is_slim if state else false
 	var item = inventory.hotbar[selected_slot]
+	var is_fp = current_camera_mode == CameraMode.FIRST_PERSON
+	
+	# Light management - World Light
+	if not _hand_light_ref:
+		_hand_light_ref = OmniLight3D.new()
+		_hand_light_ref.name = "HandLight"
+		_hand_light_ref.add_to_group("torch_lights")
+		_hand_light_ref.light_color = Color(1.0, 0.7, 0.3)
+		_hand_light_ref.light_energy = 1.5
+		_hand_light_ref.omni_range = 12.0
+		_hand_light_ref.shadow_enabled = false
+		_hand_light_ref.shadow_bias = 0.05
+		_hand_light_ref.shadow_blur = 1.5
+		# Default to hitting only World (Layer 1)
+		_hand_light_ref.light_cull_mask = 1
+		add_child(_hand_light_ref)
+		_update_light_shadows()
+
+	# Light management - ViewModel Light
+	if not _viewmodel_light_ref:
+		_viewmodel_light_ref = OmniLight3D.new()
+		_viewmodel_light_ref.name = "ViewModelLight"
+		_viewmodel_light_ref.light_color = Color(1.0, 0.7, 0.3)
+		_viewmodel_light_ref.light_energy = 2.0
+		_viewmodel_light_ref.omni_range = 5.0
+		_viewmodel_light_ref.light_cull_mask = 2 # Only affect Viewmodel layer
+		view_model_camera.add_child(_viewmodel_light_ref)
+	
+	# Always manage hand visibility in FP - Hide hand if holding an item
+	var show_hand = is_fp and not item
+	slim_hand.visible = is_slim and show_hand
+	wide_hand.visible = not is_slim and show_hand
+	
 	if not item:
 		held_item_mesh.visible = false
-		if tp_held_item_mesh: tp_held_item_mesh.visible = false
+		held_item_mesh.mesh = null
+		if tp_held_item_mesh: 
+			tp_held_item_mesh.visible = false
+			tp_held_item_mesh.mesh = null
+		held_torch_root.visible = false
+		if tp_held_torch_root: tp_held_torch_root.visible = false
+		_hand_light_ref.visible = false
+		_viewmodel_light_ref.visible = false
 		return
 	
-	held_item_mesh.visible = current_camera_mode == CameraMode.FIRST_PERSON
-	if tp_held_item_mesh: 
-		tp_held_item_mesh.visible = current_camera_mode != CameraMode.FIRST_PERSON
+	if item.type == 9: # Torch
+		held_item_mesh.visible = false
+		held_item_mesh.mesh = null
+		if tp_held_item_mesh: 
+			tp_held_item_mesh.visible = false
+			tp_held_item_mesh.mesh = null
+			
+		_hand_light_ref.visible = true
+		# Set light to ONLY hit World (Layer 1) and Decorations (Layer 4)
+		# This explicitly ignores Layer 2 (Viewmodel) and Layer 3 (Player)
+		# This ensures the held light cannot cast a shadow of any player model parts.
+		_hand_light_ref.light_cull_mask = 1 | 8
+		
+		# First Person handling
+		if is_fp:
+			held_torch_root.visible = true
+			if tp_held_torch_root: tp_held_torch_root.visible = false
+			
+			if hand_torch_mesh and world.torch_mesh:
+				hand_torch_mesh.mesh = world.torch_mesh
+				hand_torch_mesh.material_override = world.torch_material
+				hand_torch_mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+				hand_torch_mesh.layers = 2 # Viewmodel Layer
+				hand_torch_mesh.scale = Vector3.ONE * 0.8
+				hand_torch_mesh.visible = true
+			
+			# Parent world light to the camera (main world) so it lights chunks,
+			# but position it to match the hand torch.
+			if _hand_light_ref.get_parent() != camera:
+				_hand_light_ref.reparent(camera, false)
+			# Approximate the hand position relative to camera
+			_hand_light_ref.position = Vector3(0.5, -0.3, -0.5)
+			
+			# Position and enable viewmodel light (this only hits the hand/torch)
+			_viewmodel_light_ref.visible = true
+			_viewmodel_light_ref.global_position = hand_torch_mesh.global_position
+			
+		# Third Person handling
+		else:
+			held_torch_root.visible = false
+			if hand_torch_mesh: hand_torch_mesh.visible = false
+			_viewmodel_light_ref.visible = false
+			
+			if tp_held_torch_root:
+				tp_held_torch_root.visible = true
+				
+				if tp_held_torch_mesh and world.torch_mesh:
+					tp_held_torch_mesh.mesh = world.torch_mesh
+					tp_held_torch_mesh.material_override = world.torch_material
+					tp_held_torch_mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+					tp_held_torch_mesh.layers = 4 # Layer 3
+					tp_held_torch_mesh.visible = true
+				
+				# Parent light to TP root
+				if _hand_light_ref.get_parent() != tp_held_torch_root:
+					_hand_light_ref.reparent(tp_held_torch_root, false)
+				_hand_light_ref.position = Vector3(0, 0.5, 0) # Relative to TP root
+	else:
+		held_torch_root.visible = false
+		if hand_torch_mesh: hand_torch_mesh.visible = false
+		if tp_held_torch_root: tp_held_torch_root.visible = false
+		if tp_held_torch_mesh: tp_held_torch_mesh.visible = false
+		_hand_light_ref.visible = false
+		_viewmodel_light_ref.visible = false
 
-	# Re-use block mesh logic
-	var type = item.type
-	var mesh = ArrayMesh.new()
+		# Handle regular blocks
+		var type = item.type
+		var block_mesh = _generate_block_mesh(type)
+		var mat = _get_block_material(type)
+		
+		# FP Mesh
+		held_item_mesh.visible = is_fp
+		held_item_mesh.mesh = block_mesh
+		held_item_mesh.material_override = mat
+		held_item_mesh.layers = 2
+		held_item_mesh.scale = Vector3.ONE * 0.4
+		
+		# TP Mesh
+		if tp_held_item_mesh:
+			tp_held_item_mesh.visible = not is_fp
+			tp_held_item_mesh.mesh = block_mesh
+			tp_held_item_mesh.material_override = mat
+			tp_held_item_mesh.layers = 4 # Layer 3
+			tp_held_item_mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			# Scale is now controlled entirely by the editor transform on the mesh node
+
+func _get_block_material(type: int) -> Material:
+	if world and world.materials.has(type):
+		return world.materials[type]
+	return StandardMaterial3D.new()
+
+func _generate_block_mesh(_type: int) -> Mesh:
 	var st = SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	
@@ -373,42 +518,9 @@ func _update_held_item_mesh():
 		st.set_normal(face.dir)
 		for i in [0, 1, 2, 0, 2, 3]:
 			st.set_uv(face.uvs[i])
-			st.add_vertex(face.verts[i] * 0.4) # Scaling for hand
+			st.add_vertex(face.verts[i])
 	
-	var final_mesh = st.commit()
-	held_item_mesh.mesh = final_mesh
-	if tp_held_item_mesh:
-		tp_held_item_mesh.mesh = final_mesh
-	
-	# Material logic for held block (re-use from world or simplified)
-	var shader = load("res://viewmodel_voxel.gdshader")
-	var smat = ShaderMaterial.new()
-	smat.shader = shader
-	
-	if type == 2: # Grass
-		smat.set_shader_parameter("top_texture", load("res://textures/grass_top.png"))
-		smat.set_shader_parameter("side_texture", load("res://textures/grass_side.png"))
-		smat.set_shader_parameter("bottom_texture", load("res://textures/dirt.png"))
-	elif type == 5: # Wood
-		smat.set_shader_parameter("top_texture", load("res://textures/oak_wood_top.png"))
-		smat.set_shader_parameter("side_texture", load("res://textures/oak_wood_side.png"))
-		smat.set_shader_parameter("bottom_texture", load("res://textures/oak_wood_top.png"))
-	else:
-		var tex = world.BLOCK_TEXTURES.get(type, load("res://textures/stone.png"))
-		if tex is String: tex = load(tex)
-		smat.set_shader_parameter("top_texture", tex)
-		smat.set_shader_parameter("side_texture", tex)
-		smat.set_shader_parameter("bottom_texture", tex)
-	
-	held_item_mesh.material_override = smat
-	held_item_mesh.layers = 1 | 2
-	held_item_mesh.position = Vector3(0.1, -0.1, -0.2) # Relative to arm/hand
-	
-	if tp_held_item_mesh:
-		var tp_smat = smat.duplicate()
-		tp_smat.shader = load("res://voxel.gdshader") # Regular world shader
-		tp_held_item_mesh.material_override = tp_smat
-		# Note: We don't set layers for TP mesh, it should use default (Layer 1)
+	return st.commit()
 
 var _debug_timer = 0.0
 
@@ -423,6 +535,11 @@ func _process(delta):
 	_update_selection_box()
 	_animate_walk(delta)
 	_update_view_model(delta)
+
+	# Synchronize view model camera
+	if view_model_camera:
+		view_model_camera.global_transform = camera.global_transform
+		view_model_camera.fov = 85 # Increased FOV to make the hand look smaller and further away
 
 	# Fallback safety: If we are stuck in a block, reset fall damage to prevent unfair death
 	if get_last_slide_collision() != null and not is_on_floor() and velocity.length() < 1.0:
@@ -444,21 +561,26 @@ func _update_view_model(_delta = 0.0):
 	
 	if current_camera_mode == CameraMode.FIRST_PERSON:
 		view_model_arm.visible = true
-		# It's already a child of the camera, so it moves with it automatically
+		view_model_arm.scale = Vector3.ONE
+		# Position slightly lower and further away
+		view_model_base_pos = Vector3(0.4, -0.5, -0.8)
 	else:
 		view_model_arm.visible = false
 
 func _animate_walk(delta):
 	var horizontal_speed = Vector2(velocity.x, velocity.z).length()
+	idle_time += delta
+	
+	var item = inventory.hotbar[selected_slot]
+	var is_holding = item != null
+
+	if horizontal_speed > 0.1:
+		walk_time += delta * horizontal_speed * 2.5
+	else:
+		walk_time = move_toward(walk_time, 0.0, delta * 10.0)
 	
 	# View model bobbing & swing
 	if view_model_arm:
-		var bob_amount = 0.0
-		var bob_offset_y = 0.0
-		if is_on_floor() and horizontal_speed > 0.1:
-			bob_amount = sin(walk_time * 1.5) * 0.02
-			bob_offset_y = abs(sin(walk_time * 1.5)) * 0.01
-		
 		var swing_rot = 0.0
 		var swing_pos = Vector3.ZERO
 		if is_swinging:
@@ -467,13 +589,12 @@ func _animate_walk(delta):
 			swing_rot = -s * 0.5
 			swing_pos = Vector3(0, s * 0.1, -s * 0.2)
 		
-		view_model_arm.position.x = lerp(view_model_arm.position.x, bob_amount + swing_pos.x, delta * 10.0)
-		view_model_arm.position.y = lerp(view_model_arm.position.y, -bob_offset_y + swing_pos.y, delta * 10.0)
-		view_model_arm.position.z = lerp(view_model_arm.position.z, swing_pos.z, delta * 10.0)
-		view_model_arm.rotation.x = lerp(view_model_arm.rotation.x, swing_rot, delta * 15.0)
+		view_model_arm.position.x = lerp(view_model_arm.position.x, view_model_base_pos.x + swing_pos.x, delta * 10.0)
+		view_model_arm.position.y = lerp(view_model_arm.position.y, view_model_base_pos.y + swing_pos.y, delta * 10.0)
+		view_model_arm.position.z = lerp(view_model_arm.position.z, view_model_base_pos.z + swing_pos.z, delta * 10.0)
+		view_model_arm.rotation.x = lerp(view_model_arm.rotation.x, view_model_base_rot.x + swing_rot, delta * 15.0)
 
-	if is_on_floor() and horizontal_speed > 0.1:
-		walk_time += delta * horizontal_speed * 2.5
+	if horizontal_speed > 0.1:
 		var angle = sin(walk_time) * 0.6
 		
 		right_leg.rotation = Vector3(-angle, 0, 0)
@@ -482,36 +603,49 @@ func _animate_walk(delta):
 		# 3rd person arm swing
 		if is_swinging:
 			var s = sin(swing_progress * PI)
-			right_arm.rotation = Vector3(-s * 0.8, 0, 0)
+			right_arm.rotation = Vector3(-s * -0.8, 0, 0)
 		else:
-			right_arm.rotation = Vector3(angle, 0, 0)
+			if is_holding:
+				right_arm.rotation = Vector3(0.3 + (angle * 0.3), 0, 0)
+			else:
+				right_arm.rotation = Vector3(angle, 0, 0)
 			
 		left_arm.rotation = Vector3(-angle, 0, 0)
 	else:
-		walk_time = move_toward(walk_time, 0.0, delta * 10.0)
-		for part in [right_leg, left_leg, left_arm]:
+		# Idle / Neutral pose (applies on floor and in air)
+		var breathe = sin(idle_time * 1.5) * 0.05
+		var sway = cos(idle_time * 0.7) * 0.02
+		
+		for part in [right_leg, left_leg]:
 			if part:
 				part.rotation.x = move_toward(part.rotation.x, 0, delta * 5.0)
 				part.rotation.y = move_toward(part.rotation.y, 0, delta * 5.0)
 				part.rotation.z = move_toward(part.rotation.z, 0, delta * 5.0)
 		
+		if left_arm:
+			left_arm.rotation.x = lerp(left_arm.rotation.x, breathe, delta * 5.0)
+			left_arm.rotation.z = lerp(left_arm.rotation.z, -abs(sway), delta * 5.0)
+		
 		if is_swinging:
 			var s = sin(swing_progress * PI)
-			right_arm.rotation = Vector3(-s * 0.8, 0, 0)
+			right_arm.rotation = Vector3(-s * -0.8, 0, 0)
 		elif right_arm:
-			right_arm.rotation.x = move_toward(right_arm.rotation.x, 0, delta * 5.0)
-			right_arm.rotation.y = move_toward(right_arm.rotation.y, 0, delta * 5.0)
-			right_arm.rotation.z = move_toward(right_arm.rotation.z, 0, delta * 5.0)
+			var target_x = 0.3 + breathe if is_holding else breathe
+			right_arm.rotation.x = lerp(right_arm.rotation.x, target_x, delta * 5.0)
+			right_arm.rotation.z = lerp(right_arm.rotation.z, abs(sway), delta * 5.0)
 
 func _update_selection_box():
 	if raycast.is_colliding() and Input.get_mouse_mode() == Input.MOUSE_MODE_CAPTURED:
-		var pos = raycast.get_collision_point() - raycast.get_collision_normal() * 0.5
-		var block_pos_i = Vector3i(floor(pos.x), floor(pos.y), floor(pos.z))
-		var block_type = world.get_block(block_pos_i)
+		var col_pos = raycast.get_collision_point()
+		var col_normal = raycast.get_collision_normal()
 		
-		# Only show selection box if we are looking at a real block (not air)
-		if block_type >= 0:
-			selection_box.global_position = Vector3(block_pos_i) + Vector3(0.5, 0.5, 0.5)
+		# Current block selection box (Black wireframe)
+		var look_pos = col_pos - col_normal * 0.5
+		var look_block_pos = Vector3i(floor(look_pos.x), floor(look_pos.y), floor(look_pos.z))
+		var look_type = world.get_block(look_block_pos)
+		
+		if look_type >= 0:
+			selection_box.global_position = Vector3(look_block_pos) + Vector3(0.5, 0.5, 0.5)
 			selection_box.visible = true
 			return
 			
@@ -520,7 +654,16 @@ func _update_selection_box():
 func _unhandled_input(event):
 	if get_tree().paused: return
 	if event.is_action_pressed("ui_cancel"):
-		if pause_menu: pause_menu.open()
+		if inventory_ui and inventory_ui.main_inventory_panel.visible:
+			inventory_ui.toggle_inventory()
+			get_viewport().set_input_as_handled()
+			return
+		if chat_ui and chat_ui.is_chat_active():
+			chat_ui.close_chat()
+			get_viewport().set_input_as_handled()
+			return
+		if pause_menu: 
+			pause_menu.open()
 		return
 	
 	if chat_ui and chat_ui.is_chat_active():
@@ -569,38 +712,36 @@ func _unhandled_input(event):
 
 	# Manual item drop
 	if event is InputEventKey and event.pressed and event.keycode == KEY_Q:
-		if not inventory_ui.main_inventory_panel.visible:
-			var look_dir = -raycast_pivot.global_transform.basis.z
-			inventory.drop_single(selected_slot, true, global_position + look_dir * 0.5, look_dir, world)
-			return
-
-	if Input.get_mouse_mode() == Input.MOUSE_MODE_CAPTURED:
-		if event is InputEventMouseMotion:
-			rotate_y(-event.relative.x * MOUSE_SENSITIVITY)
-			camera_pitch -= event.relative.y * MOUSE_SENSITIVITY
-			camera_pitch = clamp(camera_pitch, -PI/2, PI/2)
-			
-			_apply_rotations()
+		inventory.drop_single(selected_slot, true, global_position + Vector3(0, 1.5, 0), -camera.global_transform.basis.z, world)
+		get_viewport().set_input_as_handled()
+		return
+	
+	if event is InputEventMouseMotion:
+		rotate_y(-event.relative.x * MOUSE_SENSITIVITY)
+		camera_pitch -= event.relative.y * MOUSE_SENSITIVITY
+		camera_pitch = clamp(camera_pitch, -PI/2, PI/2)
 		
-		if event is InputEventMouseButton and event.pressed:
-			if event.button_index == MOUSE_BUTTON_LEFT: _break_block()
-			elif event.button_index == MOUSE_BUTTON_RIGHT: _place_block()
-			elif event.button_index == MOUSE_BUTTON_MIDDLE: _pick_block()
-			elif event.button_index == MOUSE_BUTTON_WHEEL_UP:
-				selected_slot = (selected_slot - 1 + 9) % 9
+		_apply_rotations()
+	
+	if event is InputEventMouseButton and event.pressed:
+		if event.button_index == MOUSE_BUTTON_LEFT: _break_block()
+		elif event.button_index == MOUSE_BUTTON_RIGHT: _place_block()
+		elif event.button_index == MOUSE_BUTTON_MIDDLE: _pick_block()
+		elif event.button_index == MOUSE_BUTTON_WHEEL_UP:
+			selected_slot = (selected_slot - 1 + 9) % 9
+			inventory_ui.set_selected(selected_slot)
+			_update_held_item_mesh()
+		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+			selected_slot = (selected_slot + 1) % 9
+			inventory_ui.set_selected(selected_slot)
+			_update_held_item_mesh()
+	
+	if event is InputEventKey and event.pressed:
+		for i in range(9):
+			if event.keycode == KEY_1 + i:
+				selected_slot = i
 				inventory_ui.set_selected(selected_slot)
 				_update_held_item_mesh()
-			elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
-				selected_slot = (selected_slot + 1) % 9
-				inventory_ui.set_selected(selected_slot)
-				_update_held_item_mesh()
-		
-		if event is InputEventKey and event.pressed:
-			for i in range(9):
-				if event.keycode == KEY_1 + i:
-					selected_slot = i
-					inventory_ui.set_selected(selected_slot)
-					_update_held_item_mesh()
 
 func _apply_rotations():
 	if head_node:
@@ -620,20 +761,74 @@ func _apply_rotations():
 
 func _pick_block():
 	if raycast.is_colliding():
+		var collider = raycast.get_collider()
 		var pos = raycast.get_collision_point() - raycast.get_collision_normal() * 0.5
 		var block_pos = Vector3i(floor(pos.x), floor(pos.y), floor(pos.z))
+		
+		if collider is StaticBody3D and collider.collision_layer == 4:
+			block_pos = Vector3i(floor(collider.global_position.x), floor(collider.global_position.y), floor(collider.global_position.z))
+		
 		var block_type = world.get_block(block_pos)
 		
 		if block_type >= 0:
-			var new_slot = inventory.pick_block(block_type, selected_slot)
-			if new_slot != -1:
-				selected_slot = new_slot
+			var state_gm = get_node_or_null("/root/GameState")
+			if state_gm and state_gm.gamemode == state_gm.GameMode.CREATIVE:
+				# 1. Check if already in hotbar
+				var found_hotbar_idx = -1
+				for i in range(inventory.HOTBAR_SIZE):
+					if inventory.hotbar[i] and inventory.hotbar[i].type == block_type:
+						found_hotbar_idx = i
+						break
+				
+				if found_hotbar_idx != -1:
+					selected_slot = found_hotbar_idx
+				else:
+					# 2. Look for empty hotbar slot
+					var empty_hotbar_idx = -1
+					for i in range(inventory.HOTBAR_SIZE):
+						if inventory.hotbar[i] == null:
+							empty_hotbar_idx = i
+							break
+					
+					if empty_hotbar_idx != -1:
+						inventory.hotbar[empty_hotbar_idx] = {"type": block_type, "count": 1}
+						selected_slot = empty_hotbar_idx
+					else:
+						# 3. Hotbar is full. Replace selected and move old to inventory.
+						var old_item = inventory.hotbar[selected_slot]
+						inventory.hotbar[selected_slot] = {"type": block_type, "count": 1}
+						if old_item:
+							# Try to put old_item in inventory (returns false if full, effectively deleting it)
+							inventory.add_item(old_item.type, old_item.count)
+				
 				inventory_ui.set_selected(selected_slot)
+				inventory.inventory_changed.emit()
+				_update_held_item_mesh()
+			else:
+				var new_slot = inventory.pick_block(block_type, selected_slot)
+				if new_slot != -1:
+					selected_slot = new_slot
+					inventory_ui.set_selected(selected_slot)
+					_update_held_item_mesh()
 
 func _break_block():
 	if raycast.is_colliding():
-		var pos = raycast.get_collision_point() - raycast.get_collision_normal() * 0.5
-		var block_pos = Vector3i(floor(pos.x), floor(pos.y), floor(pos.z))
+		var collider = raycast.get_collider()
+		var block_pos: Vector3i
+		
+		if collider is StaticBody3D and collider.collision_layer == 4:
+			# We hit a torch collision box
+			# Torch collisions are children of the deco_node, which is a child of the chunk.
+			# But we placed the collision shape directly at the torch's center.
+			# However, getting the position from the shape index is complex.
+			# Easier: use the hit point and normal to find the block center.
+			var pos = raycast.get_collision_point() - raycast.get_collision_normal() * 0.1
+			block_pos = Vector3i(floor(pos.x), floor(pos.y), floor(pos.z))
+		else:
+			# Standard block
+			var pos = raycast.get_collision_point() - raycast.get_collision_normal() * 0.1
+			block_pos = Vector3i(floor(pos.x), floor(pos.y), floor(pos.z))
+		
 		var block_type = world.get_block(block_pos)
 		
 		var state_gm = get_node_or_null("/root/GameState")
@@ -642,7 +837,8 @@ func _break_block():
 		if block_type >= 0 and (block_type != 4 or is_creative_mode): # Not air and (not bedrock or creative)
 			swing()
 			
-			inventory.spawn_dropped_item(block_type, 1, Vector3(block_pos), world)
+			if not is_creative_mode:
+				inventory.spawn_dropped_item(block_type, 1, Vector3(block_pos) + Vector3(0.5, 0.5, 0.5), world)
 			
 			world.remove_block(block_pos)
 
@@ -650,14 +846,23 @@ func _place_block():
 	var item = inventory.hotbar[selected_slot]
 	if not item: return
 	if raycast.is_colliding():
+		var collider = raycast.get_collider()
+		# Don't allow placing blocks inside or against torches
+		if collider is StaticBody3D and collider.collision_layer == 4:
+			return
+			
 		var pos = raycast.get_collision_point() + raycast.get_collision_normal() * 0.5
 		var block_pos = Vector3i(floor(pos.x), floor(pos.y), floor(pos.z))
 		
+		# Prevent placing inside a torch that we might have missed hitting directly
+		if world.get_block(block_pos) == 9:
+			return
+		
 		# Check if the block position overlaps with the player's hitbox
-		var block_aabb = AABB(Vector3(block_pos) + Vector3(0.05, 0.05, 0.05), Vector3(0.9, 0.9, 0.9))
-		# Player AABB approximate based on collision shape (capsule radius ~0.2, height ~1.8)
-		# The player origin is roughly at the center of the capsule
-		var player_aabb = AABB(global_position + Vector3(-0.3, -1.0, -0.3), Vector3(0.6, 1.8, 0.6))
+		# We use a smaller block AABB to allow placing while standing on the edge
+		var block_aabb = AABB(Vector3(block_pos) + Vector3(0.1, 0.1, 0.1), Vector3(0.8, 0.8, 0.8))
+		# Player AABB for placement: smaller than physical hitbox to avoid "edge blocking"
+		var player_aabb = AABB(global_position + Vector3(-0.1, -0.9, -0.1), Vector3(0.2, 1.7, 0.2))
 		
 		if player_aabb.intersects(block_aabb):
 			return
@@ -668,9 +873,11 @@ func _place_block():
 			world.set_block(block_pos, item.type)
 			if world.has_method("play_place_sound"):
 				world.play_place_sound(Vector3(block_pos), item.type)
-			item.count -= 1
-			if item.count <= 0: inventory.hotbar[selected_slot] = null
-			inventory.inventory_changed.emit()
+			var state_gm = get_node_or_null("/root/GameState")
+			if not state_gm or state_gm.gamemode != state_gm.GameMode.CREATIVE:
+				item.count -= 1
+				if item.count <= 0: inventory.hotbar[selected_slot] = null
+				inventory.inventory_changed.emit()
 
 func _get_surface_friction():
 	if not is_on_floor(): return 1.0 # Air
@@ -684,10 +891,16 @@ func _get_surface_friction():
 
 func _update_camera_mode():
 	# Eye height relative to player root
-	var base_pos = Vector3(0, 0.7, 0) 
+	# Feet are at -0.99 (PlayerModel position)
+	# Center of head is roughly 0.6 - 0.7
+	var base_pos = Vector3(0, 0.65, 0) 
 	
 	spring_arm.position = base_pos
 	camera.scale = Vector3.ONE # Ensure no distortion
+	
+	# Adjust camera local Y so first person eye level remains correct
+	# Target total height is ~0.94 (0.2 + 0.74 from previous version)
+	camera.position.y = 0.94 - 0.65
 	
 	match current_camera_mode:
 		CameraMode.FIRST_PERSON:
@@ -695,44 +908,47 @@ func _update_camera_mode():
 			spring_arm.spring_length = 0.05
 			spring_arm.rotation.y = 0
 			spring_arm.collision_mask = 1
-			camera.position = Vector3(0, -0.05, 0)
-			camera.rotation = Vector3(0, 0, 0)
 			if crosshair: crosshair.visible = true
 		CameraMode.THIRD_PERSON_BACK:
 			_set_model_visible(true)
 			spring_arm.spring_length = 4.0
 			spring_arm.rotation.y = 0
 			spring_arm.collision_mask = 1
-			camera.position = Vector3.ZERO
-			camera.rotation = Vector3(0, 0, 0)
 			if crosshair: crosshair.visible = false
 		CameraMode.THIRD_PERSON_FRONT:
 			_set_model_visible(true)
 			spring_arm.spring_length = 4.0
 			spring_arm.rotation.y = PI
 			spring_arm.collision_mask = 1
-			camera.position = Vector3.ZERO
-			camera.rotation = Vector3(0, 0, 0) 
 			if crosshair: crosshair.visible = false
 	
 	_update_held_item_mesh()
 	_apply_rotations()
 
 func _set_model_visible(v: bool):
-	for child in player_model.find_children("*", "MeshInstance3D"):
+	var nodes_to_check = player_model.find_children("*", "VisualInstance3D", true)
+	if player_model is VisualInstance3D:
+		nodes_to_check.append(player_model)
+		
+	for child in nodes_to_check:
 		# Don't hide the viewmodel (descendant of camera)
 		if camera.is_ancestor_of(child):
 			child.visible = true
-			child.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+			if child is GeometryInstance3D:
+				child.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 			continue
 			
 		if not v:
-			# In First Person, hide meshes from the camera but keep them for shadows
-			# This ensures the camera (which is a child) stays active and visible
-			child.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
+			# In first person, hide the mesh from the camera but keep it for shadows
+			if child is GeometryInstance3D:
+				child.visible = true
+				child.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
+			else:
+				child.visible = false
 		else:
 			child.visible = true
-			child.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+			if child is GeometryInstance3D:
+				child.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 
 func _physics_process(delta):
 	if chat_ui and chat_ui.is_chat_active():
@@ -765,13 +981,13 @@ func _physics_process(delta):
 
 	if is_flying:
 		var v_dir = 0.0
-		if Input.is_key_pressed(KEY_SPACE): v_dir += 1.0
-		if Input.is_key_pressed(KEY_SHIFT): v_dir -= 1.0
+		if Input.is_action_pressed("jump"): v_dir += 1.0
+		if Input.is_action_pressed("sneak"): v_dir -= 1.0
 		
 		var target_v_speed = v_dir * (FLY_SPRINT_SPEED if is_sprinting else FLY_SPEED)
 		velocity.y = move_toward(velocity.y, target_v_speed, delta * FLY_SPEED * 5.0)
 	else:
-		if Input.is_key_pressed(KEY_SPACE):
+		if Input.is_action_pressed("jump"):
 			if is_on_floor():
 				velocity.y = JUMP_VELOCITY
 			elif in_water:
@@ -780,16 +996,16 @@ func _physics_process(delta):
 
 	# Input Direction
 	var input_dir = Vector2.ZERO
-	if Input.is_key_pressed(KEY_W): input_dir.y -= 1
-	if Input.is_key_pressed(KEY_S): input_dir.y += 1
-	if Input.is_key_pressed(KEY_A): input_dir.x -= 1
-	if Input.is_key_pressed(KEY_D): input_dir.x += 1
+	if Input.is_action_pressed("move_left"): input_dir.x -= 1.0
+	if Input.is_action_pressed("move_right"): input_dir.x += 1.0
+	if Input.is_action_pressed("move_forward"): input_dir.y -= 1.0
+	if Input.is_action_pressed("move_back"): input_dir.y += 1.0
 	
-	# Calculate move direction relative to player rotation
-	var move_dir = (transform.basis * Vector3(input_dir.x, 0, input_dir.y)).normalized()
 	var target_speed = SPRINT_SPEED if is_sprinting else SPEED
 	if is_flying:
 		target_speed = FLY_SPRINT_SPEED if is_sprinting else FLY_SPEED
+	
+	var move_dir = (transform.basis * Vector3(input_dir.x, 0, input_dir.y)).normalized()
 	
 	var horizontal_vel = Vector2(velocity.x, velocity.z)
 	
@@ -802,7 +1018,7 @@ func _physics_process(delta):
 		var target_h_vel = Vector2(move_dir.x, move_dir.z) * target_speed * 0.6
 		horizontal_vel = horizontal_vel.move_toward(target_h_vel, water_accel * delta)
 		
-		if not Input.is_key_pressed(KEY_SPACE) and not is_on_floor():
+		if not Input.is_action_pressed("jump") and not is_on_floor():
 			velocity.y = move_toward(velocity.y, -1.0, 5.0 * delta)
 	elif is_on_floor():
 		var accel = 80.0 # High acceleration for precision
@@ -851,6 +1067,7 @@ func _physics_process(delta):
 	_was_on_floor = is_on_floor()
 
 	move_and_slide()
+	_handle_stuck(delta)
 	
 	# Void Damage
 	if global_position.y < -20.0:
@@ -864,3 +1081,46 @@ func _physics_process(delta):
 			_void_damage_timer = 0.0
 	else:
 		_void_damage_timer = 0.0
+
+func _handle_stuck(_delta):
+	if not world: return
+	
+	# Check points at feet, waist, and head level
+	# We use smaller offsets to ensure we are actually INSIDE the block
+	var check_offsets = [
+		Vector3(0, -0.5, 0), Vector3(0, 0, 0), Vector3(0, 0.5, 0),
+		Vector3(0.1, 0, 0), Vector3(-0.1, 0, 0),
+		Vector3(0, 0, 0.1), Vector3(0, 0, -0.1)
+	]
+	
+	var stuck_block_pos = Vector3i.ZERO
+	var is_stuck = false
+	
+	for offset in check_offsets:
+		var p = global_position + offset
+		var block_pos = Vector3i(floor(p.x), floor(p.y), floor(p.z))
+		var type = world.get_block(block_pos)
+		if type >= 0 and type != 7 and type != 8 and type != 9: # Ignore Air, Water, and Torches
+			stuck_block_pos = block_pos
+			is_stuck = true
+			break
+	
+	if is_stuck:
+		var bc = Vector3(stuck_block_pos) + Vector3(0.5, 0.5, 0.5)
+		var diff = global_position - bc
+		if diff.length_squared() < 0.001: diff = Vector3(1, 0, 0)
+		
+		var abs_diff = diff.abs()
+		# Match the actual collision shape radius (0.16) plus a small buffer
+		var player_radius = 0.18 
+		var player_half_height = 0.9
+		
+		if abs_diff.x > abs_diff.y and abs_diff.x > abs_diff.z:
+			global_position.x = bc.x + sign(diff.x) * (0.5 + player_radius + 0.01)
+			velocity.x = 0
+		elif abs_diff.y > abs_diff.x and abs_diff.y > abs_diff.z:
+			global_position.y = bc.y + sign(diff.y) * (0.5 + player_half_height + 0.01)
+			velocity.y = 0
+		else:
+			global_position.z = bc.z + sign(diff.z) * (0.5 + player_radius + 0.01)
+			velocity.z = 0

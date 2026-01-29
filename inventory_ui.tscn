@@ -1,6 +1,7 @@
-[gd_scene load_steps=2 format=3 uid="uid://chcgtng4i5l71"]
+[gd_scene load_steps=3 format=3 uid="uid://chcgtng4i5l71"]
 
 [ext_resource type="Script" uid="uid://bhtayjfettf3" path="res://inventory_ui.gd" id="1_5v8q7"]
+[ext_resource type="PackedScene" uid="uid://d3km7bpwabb7c" path="res://inventory_slot.tscn" id="2_34y5v"]
 
 [node name="InventoryUI" type="Control"]
 layout_mode = 3
@@ -33,22 +34,28 @@ metadata/_tab_index = 0
 layout_mode = 2
 columns = 9
 
+[node name="Spacer" type="Control" parent="MainInventoryPanel/InventoryTabs/Inventory"]
+custom_minimum_size = Vector2(0, 15)
+layout_mode = 2
+
 [node name="MainHotbarGridContainer" type="GridContainer" parent="MainInventoryPanel/InventoryTabs/Inventory"]
 layout_mode = 2
 columns = 9
-
-[node name="Spacer" type="Control" parent="MainInventoryPanel/InventoryTabs/Inventory"]
-custom_minimum_size = Vector2(0, 10)
-layout_mode = 2
 
 [node name="Creative" type="VBoxContainer" parent="MainInventoryPanel/InventoryTabs"]
 visible = false
 layout_mode = 2
 metadata/_tab_index = 1
 
-[node name="CreativeGridContainer" type="GridContainer" parent="MainInventoryPanel/InventoryTabs/Creative"]
+[node name="CreativeHBox" type="HBoxContainer" parent="MainInventoryPanel/InventoryTabs/Creative"]
+layout_mode = 2
+
+[node name="CreativeGridContainer" type="GridContainer" parent="MainInventoryPanel/InventoryTabs/Creative/CreativeHBox"]
 layout_mode = 2
 columns = 9
+
+[node name="TrashSlot" parent="MainInventoryPanel/InventoryTabs/Creative/CreativeHBox" instance=ExtResource("2_34y5v")]
+layout_mode = 2
 
 [node name="HotbarPanel" type="PanelContainer" parent="."]
 layout_mode = 0
@@ -83,3 +90,12 @@ mouse_filter = 2
 
 [node name="SelectionOutline" type="Panel" parent="."]
 layout_mode = 0
+
+[node name="TooltipPanel" type="PanelContainer" parent="."]
+top_level = true
+z_index = 100
+layout_mode = 0
+mouse_filter = 2
+
+[node name="TooltipLabel" type="Label" parent="TooltipPanel"]
+layout_mode = 2

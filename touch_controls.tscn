@@ -1,0 +1,61 @@
+[gd_scene format=3 uid="uid://uy614t6w7dli"]
+
+[ext_resource type="Texture2D" uid="uid://csl3wyofysye7" path="res://icon.svg" id="2_qaoo7"]
+
+[node name="TouchControls" type="CanvasLayer" unique_id=514640801]
+
+[node name="Control" type="Control" parent="." unique_id=1067535270]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="DPad" type="Control" parent="Control" unique_id=1141794010]
+anchors_preset = 0
+anchor_top = 1.0
+anchor_bottom = 1.0
+
+[node name="Up" type="TouchScreenButton" parent="Control/DPad" unique_id=1192931816]
+position = Vector2(154, -445)
+scale = Vector2(1, 0.9140625)
+texture_normal = ExtResource("2_qaoo7")
+action = "move_forward"
+
+[node name="Down" type="TouchScreenButton" parent="Control/DPad" unique_id=1758490292]
+position = Vector2(152, -207)
+texture_normal = ExtResource("2_qaoo7")
+action = "move_back"
+
+[node name="Left" type="TouchScreenButton" parent="Control/DPad" unique_id=15143145]
+position = Vector2(277, -326)
+texture_normal = ExtResource("2_qaoo7")
+action = "move_left"
+
+[node name="Right" type="TouchScreenButton" parent="Control/DPad" unique_id=897140357]
+position = Vector2(31, -333)
+texture_normal = ExtResource("2_qaoo7")
+action = "move_right"
+
+[node name="Actions" type="Control" parent="Control" unique_id=1868180214]
+anchors_preset = 0
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="JumpButton" type="TouchScreenButton" parent="Control/Actions" unique_id=1766653146]
+position = Vector2(-209, -186)
+texture_normal = ExtResource("2_qaoo7")
+action = "space"
+
+[node name="AttackButton" type="TouchScreenButton" parent="Control/Actions" unique_id=1406405553]
+position = Vector2(-304, -397)
+texture_normal = ExtResource("2_qaoo7")
+action = "click_left"
+
+[node name="InteractButton" type="TouchScreenButton" parent="Control/Actions" unique_id=938314415]
+position = Vector2(-142, -393)
+texture_normal = ExtResource("2_qaoo7")
+action = "click_right"
