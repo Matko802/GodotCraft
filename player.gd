@@ -594,7 +594,10 @@ func _generate_block_mesh(_type: int) -> Mesh:
 
 var _debug_timer = 0.0
 
+var _last_mouse_mode = Input.MOUSE_MODE_CAPTURED
+
 func _process(delta):
+	_check_mouse_lock_loss()
 	_debug_timer += delta
 	if _debug_timer > 2.0:
 		_debug_timer = 0.0
@@ -615,6 +618,17 @@ func _process(delta):
 	# Fallback safety: If we are stuck in a block, reset fall damage to prevent unfair death
 	if get_last_slide_collision() != null and not is_on_floor() and velocity.length() < 1.0:
 		_fall_start_y = global_position.y
+
+func _check_mouse_lock_loss():
+	var current_mode = Input.get_mouse_mode()
+	if OS.has_feature("web"):
+		# On web, the browser intercepts ESC to release the mouse.
+		# If we were captured and now we aren't, and the menu isn't open, open it.
+		if _last_mouse_mode == Input.MOUSE_MODE_CAPTURED and current_mode != Input.MOUSE_MODE_CAPTURED:
+			if not get_tree().paused and not inventory_ui.main_inventory_panel.visible and not (chat_ui and chat_ui.is_chat_active()):
+				if pause_menu:
+					pause_menu.open()
+	_last_mouse_mode = current_mode
 
 func _update_mining(delta):
 	var state = get_node_or_null("/root/GameState")
