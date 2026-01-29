@@ -797,7 +797,6 @@ func _animate_walk(delta):
 
 	if horizontal_speed > 0.1:
 		var angle = sin(walk_time) * (0.6 + sneak_progress * -0.2)
-		var bend = sneak_progress * -0.3
 		var arm_bend = sneak_progress * 0.2
 		
 		right_leg.rotation = Vector3(-angle, 0, 0)
@@ -818,7 +817,6 @@ func _animate_walk(delta):
 		# Idle / Neutral pose (applies on floor and in air)
 		var breathe = sin(idle_time * 1.5) * 0.05
 		var sway = cos(idle_time * 0.7) * 0.02
-		var bend = sneak_progress * -0.3
 		var arm_bend = sneak_progress * 0.2
 		
 		for part in [right_leg, left_leg]:
