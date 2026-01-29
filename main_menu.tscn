@@ -151,128 +151,191 @@ layout_mode = 2
 text = "SETTINGS"
 horizontal_alignment = 1
 
-[node name="SettingsScroll" type="ScrollContainer" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer" unique_id=2068935584]
+[node name="SettingsTabContainer" type="TabContainer" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer" unique_id=1341763615]
 layout_mode = 2
-size_flags_vertical = 3
+current_tab = 0
 
-[node name="SettingsList" type="VBoxContainer" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll" unique_id=2084032165]
+[node name="General" type="VBoxContainer" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsTabContainer" unique_id=375045705]
 layout_mode = 2
-size_flags_horizontal = 3
+metadata/_tab_index = 0
 
-[node name="GeneralSectionLabel" type="Label" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList" unique_id=1229951333]
-layout_mode = 2
-text = "--- General ---"
-horizontal_alignment = 1
-
-[node name="UsernameHBox" type="HBoxContainer" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList" unique_id=884994089]
+[node name="UsernameHBox" type="HBoxContainer" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsTabContainer/General" unique_id=884994089]
 layout_mode = 2
 
-[node name="UsernameLabelUI" type="Label" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList/UsernameHBox" unique_id=723995222]
+[node name="UsernameLabelUI" type="Label" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsTabContainer/General/UsernameHBox" unique_id=723995222]
 layout_mode = 2
 text = "Username: 	"
 
-[node name="UsernameInputUI" type="LineEdit" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList/UsernameHBox" unique_id=1830627370]
+[node name="UsernameInputUI" type="LineEdit" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsTabContainer/General/UsernameHBox" unique_id=1830627370]
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="GraphicsSectionLabel" type="Label" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList" unique_id=1911146642]
+[node name="SlimModelCheckBoxUI" type="CheckBox" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsTabContainer/General" unique_id=1261302249]
 layout_mode = 2
-text = "--- Graphics ---"
-horizontal_alignment = 1
+text = "Slim Player Model"
 
-[node name="FullscreenCheckBoxUI" type="CheckBox" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList" unique_id=1420771594]
+[node name="CustomTextureHBox" type="HBoxContainer" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsTabContainer/General" unique_id=1987675511]
+layout_mode = 2
+
+[node name="CustomTextureLabelUI" type="Label" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsTabContainer/General/CustomTextureHBox" unique_id=1294653255]
+layout_mode = 2
+text = "Custom Texture Path: 	"
+
+[node name="BrowseTextureButtonUI" type="Button" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsTabContainer/General/CustomTextureHBox" unique_id=432330336]
+layout_mode = 2
+text = "Browse"
+
+[node name="Video" type="VBoxContainer" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsTabContainer" unique_id=17307476]
+visible = false
+layout_mode = 2
+metadata/_tab_index = 1
+
+[node name="FullscreenCheckBoxUI" type="CheckBox" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsTabContainer/Video" unique_id=1420771594]
 layout_mode = 2
 text = "Borderless Fullscreen"
 
-[node name="RenderDistanceHBox" type="HBoxContainer" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList" unique_id=154470430]
+[node name="RenderDistanceHBox" type="HBoxContainer" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsTabContainer/Video" unique_id=154470430]
 layout_mode = 2
 
-[node name="RenderDistanceLabelUI" type="Label" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList/RenderDistanceHBox" unique_id=1165319817]
+[node name="RenderDistanceLabelUI" type="Label" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsTabContainer/Video/RenderDistanceHBox" unique_id=1165319817]
 custom_minimum_size = Vector2(250, 0)
 layout_mode = 2
 text = "Render Distance: 4"
 
-[node name="RenderDistanceSliderUI" type="HSlider" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList/RenderDistanceHBox" unique_id=202906176]
+[node name="RenderDistanceSliderUI" type="HSlider" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsTabContainer/Video/RenderDistanceHBox" unique_id=202906176]
 layout_mode = 2
 size_flags_horizontal = 3
 min_value = 2.0
 max_value = 16.0
 value = 4.0
 
-[node name="FOVHBox" type="HBoxContainer" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList" unique_id=595153767]
+[node name="FOVHBox" type="HBoxContainer" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsTabContainer/Video" unique_id=595153767]
 layout_mode = 2
 
-[node name="FOVLabelUI" type="Label" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList/FOVHBox" unique_id=1229382220]
+[node name="FOVLabelUI" type="Label" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsTabContainer/Video/FOVHBox" unique_id=1229382220]
 custom_minimum_size = Vector2(250, 0)
 layout_mode = 2
 text = "FOV: 75"
 
-[node name="FOVSliderUI" type="HSlider" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList/FOVHBox" unique_id=964104719]
+[node name="FOVSliderUI" type="HSlider" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsTabContainer/Video/FOVHBox" unique_id=964104719]
 layout_mode = 2
 size_flags_horizontal = 3
 min_value = 30.0
 max_value = 110.0
 value = 75.0
 
-[node name="SlimModelCheckBoxUI" type="CheckBox" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList" unique_id=1261302249]
-layout_mode = 2
-text = "Slim Player Model"
-
-[node name="CustomTextureHBox" type="HBoxContainer" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList" unique_id=1987675511]
+[node name="VSyncHBox" type="HBoxContainer" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsTabContainer/Video" unique_id=253239378]
 layout_mode = 2
 
-[node name="CustomTextureLabelUI" type="Label" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList/CustomTextureHBox" unique_id=1294653255]
-layout_mode = 2
-text = "Custom Texture Path: 	"
-
-[node name="BrowseTextureButtonUI" type="Button" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList/CustomTextureHBox" unique_id=432330336]
-layout_mode = 2
-text = "Browse"
-
-[node name="VSyncHBox" type="HBoxContainer" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList" unique_id=253239378]
-layout_mode = 2
-
-[node name="VSyncLabelUI" type="Label" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList/VSyncHBox" unique_id=1563079967]
+[node name="VSyncLabelUI" type="Label" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsTabContainer/Video/VSyncHBox" unique_id=1563079967]
 layout_mode = 2
 text = "VSync:"
 
-[node name="VSyncCheckBoxUI" type="CheckBox" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList/VSyncHBox" unique_id=673095432]
+[node name="VSyncCheckBoxUI" type="CheckBox" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsTabContainer/Video/VSyncHBox" unique_id=673095432]
 layout_mode = 2
 
-[node name="ShadowsHBox" type="HBoxContainer" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList" unique_id=1694464827]
+[node name="ShadowsHBox" type="HBoxContainer" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsTabContainer/Video" unique_id=1694464827]
 layout_mode = 2
 
-[node name="ShadowsLabelUI" type="Label" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList/ShadowsHBox" unique_id=1987744801]
+[node name="ShadowsLabelUI" type="Label" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsTabContainer/Video/ShadowsHBox" unique_id=1987744801]
 layout_mode = 2
 text = "Shadows:"
 
-[node name="ShadowsSliderUI" type="HSlider" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList/ShadowsHBox" unique_id=1218978062]
+[node name="ShadowsSliderUI" type="HSlider" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsTabContainer/Video/ShadowsHBox" unique_id=1218978062]
 layout_mode = 2
 size_flags_horizontal = 3
 max_value = 4.0
 
-[node name="MSAAHBox" type="HBoxContainer" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList" unique_id=711642503]
+[node name="MSAAHBox" type="HBoxContainer" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsTabContainer/Video" unique_id=711642503]
 layout_mode = 2
 
-[node name="MSAALabelUI" type="Label" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList/MSAAHBox" unique_id=383300066]
+[node name="MSAALabelUI" type="Label" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsTabContainer/Video/MSAAHBox" unique_id=383300066]
 layout_mode = 2
 text = "Anti-Aliasing:"
 
-[node name="MSAAOptionButtonUI" type="OptionButton" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList/MSAAHBox" unique_id=1257122844]
+[node name="MSAAOptionButtonUI" type="OptionButton" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsTabContainer/Video/MSAAHBox" unique_id=1257122844]
 layout_mode = 2
+
+[node name="Audio" type="VBoxContainer" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsTabContainer" unique_id=1797902647]
+visible = false
+layout_mode = 2
+metadata/_tab_index = 2
+
+[node name="MasterVolumeHBox" type="HBoxContainer" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsTabContainer/Audio" unique_id=298282449]
+layout_mode = 2
+
+[node name="MasterVolumeLabelUI" type="Label" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsTabContainer/Audio/MasterVolumeHBox" unique_id=1929000115]
+custom_minimum_size = Vector2(250, 0)
+layout_mode = 2
+text = "Master Volume: 100%"
+
+[node name="MasterVolumeSliderUI" type="HSlider" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsTabContainer/Audio/MasterVolumeHBox" unique_id=270851162]
+layout_mode = 2
+size_flags_horizontal = 3
+max_value = 1.0
+step = 0.01
+value = 1.0
+
+[node name="BlocksVolumeHBox" type="HBoxContainer" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsTabContainer/Audio" unique_id=1071578399]
+layout_mode = 2
+
+[node name="BlocksVolumeLabelUI" type="Label" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsTabContainer/Audio/BlocksVolumeHBox" unique_id=1183959840]
+custom_minimum_size = Vector2(250, 0)
+layout_mode = 2
+text = "Blocks Volume: 100%"
+
+[node name="BlocksVolumeSliderUI" type="HSlider" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsTabContainer/Audio/BlocksVolumeHBox" unique_id=659998643]
+layout_mode = 2
+size_flags_horizontal = 3
+max_value = 1.0
+step = 0.01
+value = 1.0
+
+[node name="DamageVolumeHBox" type="HBoxContainer" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsTabContainer/Audio" unique_id=542174073]
+layout_mode = 2
+
+[node name="DamageVolumeLabelUI" type="Label" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsTabContainer/Audio/DamageVolumeHBox" unique_id=133330325]
+custom_minimum_size = Vector2(250, 0)
+layout_mode = 2
+text = "Damage Volume: 100%"
+
+[node name="DamageVolumeSliderUI" type="HSlider" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsTabContainer/Audio/DamageVolumeHBox" unique_id=1440604508]
+layout_mode = 2
+size_flags_horizontal = 3
+max_value = 1.0
+step = 0.01
+value = 1.0
+
+[node name="PickupVolumeHBox" type="HBoxContainer" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsTabContainer/Audio" unique_id=531953347]
+layout_mode = 2
+
+[node name="PickupVolumeLabelUI" type="Label" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsTabContainer/Audio/PickupVolumeHBox" unique_id=768867356]
+custom_minimum_size = Vector2(250, 0)
+layout_mode = 2
+text = "Pickup Volume: 100%"
+
+[node name="PickupVolumeSliderUI" type="HSlider" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsTabContainer/Audio/PickupVolumeHBox" unique_id=947408720]
+layout_mode = 2
+size_flags_horizontal = 3
+max_value = 1.0
+step = 0.01
+value = 1.0
 
 [node name="SettingsBackButtonUI" type="Button" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer" unique_id=1992080723]
 layout_mode = 2
 text = "Back"
 
 [node name="VersionLabel" type="Label" parent="." unique_id=1680041473]
-layout_mode = 0
+layout_mode = 1
+anchors_preset = 3
 anchor_left = 1.0
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = -93.0
-offset_top = -23.0
-offset_right = -10.0
-offset_bottom = -10.0
+offset_left = -107.0
+offset_top = -32.0
+offset_right = -14.0
+offset_bottom = -9.0
+grow_horizontal = 0
+grow_vertical = 0
 text = "build 0.0.8.0"

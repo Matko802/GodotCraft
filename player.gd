@@ -87,7 +87,7 @@ func _play_fall_sound(dist: float):
 		audio.stream = load(FALL_BIG_SOUNDS[randi() % FALL_BIG_SOUNDS.size()])
 	else:
 		audio.stream = load(FALL_SMALL_SOUND)
-	audio.bus = "Master"
+	audio.bus = "Damage"
 	add_child(audio)
 	audio.play()
 	audio.finished.connect(audio.queue_free)
@@ -96,7 +96,7 @@ func _play_damage_sound():
 	var sound_path = DAMAGE_SOUNDS[randi() % DAMAGE_SOUNDS.size()]
 	var audio = AudioStreamPlayer.new()
 	audio.stream = load(sound_path)
-	audio.bus = "Master"
+	audio.bus = "Damage"
 	add_child(audio)
 	audio.play()
 	audio.finished.connect(audio.queue_free)

@@ -22,8 +22,12 @@ func _process(delta):
 	var fps = Engine.get_frames_per_second()
 	var lows = _calculate_lows()
 	
+	var version = ProjectSettings.get_setting("application/config/version", "0.0.0.0")
+	var engine_info = Engine.get_version_info()
+	var engine_str = "%d.%d.%d" % [engine_info.major, engine_info.minor, engine_info.patch]
+	
 	var text = ""
-	text += "GodotCraft build 0.0.8.0\n"
+	text += "GodotCraft build %s (Godot %s)\n" % [version, engine_str]
 	text += "FPS: %d (1%%: %d, 0.1%%: %d)\n" % [fps, lows.one_percent, lows.zero_one_percent]
 	
 	if player:
@@ -35,6 +39,11 @@ func _process(delta):
 			var cx = floor(pos.x / world.chunk_size)
 			var cz = floor(pos.z / world.chunk_size)
 			text += "Chunk: %d %d\n" % [cx, cz]
+			
+			# Time display
+			var hours = int(world.time / 1000.0)
+			var minutes = int((world.time / 1000.0 - hours) * 60.0)
+			text += "Time: %02d:%02d (Day %d)\n" % [hours, minutes, world.days_passed + 1]
 	
 	if state:
 		text += "Render Distance: %d\n" % state.render_distance

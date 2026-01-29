@@ -209,7 +209,7 @@ func _process(delta):
 func _play_pickup_sound():
 	var audio = AudioStreamPlayer.new()
 	audio.stream = load("res://textures/Sounds/random/pop.ogg")
-	audio.bus = "Master"
+	audio.bus = "Pickup"
 	# Create a temporary node in the world to play the sound
 	get_tree().root.add_child(audio)
 	audio.play()

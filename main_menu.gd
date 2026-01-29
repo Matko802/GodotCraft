@@ -30,6 +30,14 @@ extends Control
 @onready var shadows_slider = find_child("ShadowsSliderUI", true) as HSlider
 @onready var shadows_label = find_child("ShadowsLabelUI", true) as Label
 @onready var msaa_button = find_child("MSAAOptionButtonUI", true) as OptionButton
+@onready var master_volume_slider = find_child("MasterVolumeSliderUI", true) as HSlider
+@onready var master_volume_label = find_child("MasterVolumeLabelUI", true) as Label
+@onready var blocks_volume_slider = find_child("BlocksVolumeSliderUI", true) as HSlider
+@onready var blocks_volume_label = find_child("BlocksVolumeLabelUI", true) as Label
+@onready var damage_volume_slider = find_child("DamageVolumeSliderUI", true) as HSlider
+@onready var damage_volume_label = find_child("DamageVolumeLabelUI", true) as Label
+@onready var pickup_volume_slider = find_child("PickupVolumeSliderUI", true) as HSlider
+@onready var pickup_volume_label = find_child("PickupVolumeLabelUI", true) as Label
 @onready var slim_checkbox = find_child("SlimModelCheckBoxUI", true) as CheckBox
 @onready var custom_texture_input = find_child("CustomTextureInputUI", true) as LineEdit
 @onready var browse_texture_button = find_child("BrowseTextureButtonUI", true) as Button
@@ -75,6 +83,11 @@ func _ready():
 	msaa_button.add_item("8x", 3)
 	msaa_button.item_selected.connect(_on_msaa_selected)
 	
+	master_volume_slider.value_changed.connect(_on_master_volume_changed)
+	blocks_volume_slider.value_changed.connect(_on_blocks_volume_changed)
+	damage_volume_slider.value_changed.connect(_on_damage_volume_changed)
+	pickup_volume_slider.value_changed.connect(_on_pickup_volume_changed)
+	
 	slim_checkbox.toggled.connect(_on_slim_toggled)
 	browse_texture_button.pressed.connect(_on_browse_texture_pressed)
 	username_input.text_changed.connect(_on_username_changed)
@@ -85,6 +98,8 @@ func _ready():
 	settings_screen.visible = false
 	
 	refresh_save_list()
+	
+	_update_version_label()
 	
 	var state = get_node_or_null("/root/GameState")
 	if state:
@@ -98,8 +113,24 @@ func _ready():
 		shadows_slider.value = state.shadow_quality
 		_update_shadows_label(state.shadow_quality)
 		msaa_button.selected = state.msaa
+		master_volume_slider.value = state.master_volume
+		master_volume_label.text = "Master Volume: %d%%" % int(state.master_volume * 100)
+		blocks_volume_slider.value = state.blocks_volume
+		blocks_volume_label.text = "Blocks Volume: %d%%" % int(state.blocks_volume * 100)
+		damage_volume_slider.value = state.damage_volume
+		damage_volume_label.text = "Damage Volume: %d%%" % int(state.damage_volume * 100)
+		pickup_volume_slider.value = state.pickup_volume
+		pickup_volume_label.text = "Pickup Volume: %d%%" % int(state.pickup_volume * 100)
 		slim_checkbox.button_pressed = state.is_slim
 		username_input.text = state.username
+
+func _update_version_label():
+	var version = ProjectSettings.get_setting("application/config/version", "0.0.0.0")
+	var engine_info = Engine.get_version_info()
+	var engine_str = "Godot %d.%d.%d" % [engine_info.major, engine_info.minor, engine_info.patch]
+	
+	if has_node("VersionLabel"):
+		$VersionLabel.text = "build %s (%s)" % [version, engine_str]
 
 func _style_all_buttons():
 	# Find all buttons and other controls in the scene
@@ -158,6 +189,10 @@ func _on_external_settings_changed():
 		msaa_button.selected = state.msaa
 		render_distance_slider.value = state.render_distance
 		fov_slider.value = state.fov
+		master_volume_slider.value = state.master_volume
+		master_volume_label.text = "Master Volume: %d%%" % int(state.master_volume * 100)
+		blocks_volume_slider.value = state.blocks_volume
+		blocks_volume_label.text = "Blocks Volume: %d%%" % int(state.blocks_volume * 100)
 
 func _on_vsync_toggled(toggled_on):
 	var state = get_node_or_null("/root/GameState")
@@ -188,6 +223,34 @@ func _on_msaa_selected(index):
 		state.msaa = index
 		state.save_settings()
 		state._apply_graphics_settings()
+
+func _on_master_volume_changed(value):
+	master_volume_label.text = "Master Volume: %d%%" % int(value * 100)
+	var state = get_node_or_null("/root/GameState")
+	if state:
+		state.master_volume = value
+		state.save_settings()
+
+func _on_blocks_volume_changed(value):
+	blocks_volume_label.text = "Blocks Volume: %d%%" % int(value * 100)
+	var state = get_node_or_null("/root/GameState")
+	if state:
+		state.blocks_volume = value
+		state.save_settings()
+
+func _on_damage_volume_changed(value):
+	damage_volume_label.text = "Damage Volume: %d%%" % int(value * 100)
+	var state = get_node_or_null("/root/GameState")
+	if state:
+		state.damage_volume = value
+		state.save_settings()
+
+func _on_pickup_volume_changed(value):
+	pickup_volume_label.text = "Pickup Volume: %d%%" % int(value * 100)
+	var state = get_node_or_null("/root/GameState")
+	if state:
+		state.pickup_volume = value
+		state.save_settings()
 
 func refresh_save_list():
 	save_list.clear()

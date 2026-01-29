@@ -104,8 +104,10 @@ var mesh_throttle_timer = 0.0
 var spawn_pos = Vector3(8, 40, 8)
 var world_mutex = Mutex.new()
 
-# Time system (0 to 24000, 24000 ticks = 20 minutes)
+# Time system (0 to 24000, 24000 ticks = 24 hours)
+# 0 = 06:00 (Sunrise), 6000 = 12:00 (Noon), 12000 = 18:00 (Sunset), 18000 = 00:00 (Midnight)
 var time: float = 6000.0 # Start at Noon
+var days_passed: int = 0
 const TICKS_PER_SECOND = 20.0
 const MAX_TIME = 24000.0
 
@@ -279,7 +281,7 @@ func play_break_sound(pos: Vector3, type: int):
 	
 	var audio = AudioStreamPlayer3D.new()
 	audio.stream = load(sound_path)
-	audio.bus = "Master"
+	audio.bus = "Blocks"
 	# Minecraft-like attenuation: very audible up to unit_size, then fades
 	audio.unit_size = 15.0 
 	audio.max_distance = 64.0
@@ -299,7 +301,7 @@ func play_place_sound(pos: Vector3, type: int):
 	
 	var audio = AudioStreamPlayer3D.new()
 	audio.stream = load(sound_path)
-	audio.bus = "Master"
+	audio.bus = "Blocks"
 	audio.unit_size = 12.0
 	audio.max_distance = 48.0
 	audio.pitch_scale = randf_range(0.8, 1.2) # Vary pitch for placement
@@ -558,46 +560,72 @@ func _update_sun_rotation():
 	if player:
 		celestial_bodies.global_position = player.global_position
 
-	# Rotation: 0 is sunrise, 6000 is noon, 12000 is sunset, 18000 is midnight
+	# Minecraft Time mapping:
+	# 0 = Sunrise/Early Morning (Sun at Horizon)
+	# 6000 = Noon (Sun at Zenith)
+	# 12000 = Sunset (Sun at Horizon)
+	# 18000 = Midnight (Moon at Zenith)
+	
 	var angle = (time / MAX_TIME) * 360.0
 	celestial_bodies.rotation_degrees.x = angle
 	
-	# Light rotation should match the sun's position
-	# When sun is at 90 degrees (overhead), light should point down (-90)
+	# Light rotation matches sun/moon
+	# During day (0-12000), sun is up. During night (12000-24000), moon is up.
+	var is_day = time < 12000.0
+	
+	# When sun is at 90 deg (Noon), light should point down (-90)
 	sun.rotation_degrees.x = -angle
 	sun.rotation_degrees.y = 180.0
 
-	# Adjust light intensity and environment based on time
-	var is_day = time < 12000
-	var cycle_pos = time / 12000.0 if is_day else (time - 12000.0) / 12000.0
-	var strength = sin(cycle_pos * PI)
+	# Calculate day/night intensity (0.0 to 1.0)
+	# Day peaks at 6000, Night peaks at 18000
+	var day_pos = clamp(sin(deg_to_rad(angle)), 0.0, 1.0)
+	var night_pos = clamp(sin(deg_to_rad(angle + 180.0)), 0.0, 1.0)
 	
-	# Light energy: bright at day, dim at night but still visible
-	sun.light_energy = strength * (0.9 if is_day else 0.25) + 0.2
-	sun.light_color = Color(1.0, 0.95, 0.8).lerp(Color(0.6, 0.6, 0.9), 0.0 if is_day else 1.0)
+	# Smooth transitions for colors
+	var transition = clamp(sin(deg_to_rad(angle)) * 2.0, -1.0, 1.0) * 0.5 + 0.5
+	
+	# Light colors
+	var day_color = Color(1.0, 0.95, 0.85)
+	var sunset_color = Color(1.0, 0.5, 0.2)
+	var night_color = Color(0.15, 0.15, 0.3)
+	
+	if is_day:
+		sun.light_energy = day_pos * 0.6 + 0.1
+		sun.light_color = sunset_color.lerp(day_color, day_pos)
+	else:
+		sun.light_energy = night_pos * 0.4 + 0.2
+		sun.light_color = night_color
 	
 	if world_env:
 		var env = world_env.environment
-		env.tonemap_mode = 1 # TONEMAP_REINHARD
-		env.tonemap_exposure = 0.8
 		
-		var day_sky = Color(0.4, 0.6, 1.0) # Slightly darker sky
-		var night_sky = Color(0.1, 0.1, 0.2) # Brightened night sky
+		# Atmospheric Colors
+		var sky_top_day = Color(0.4, 0.6, 1.0)
+		var sky_top_night = Color(0.05, 0.05, 0.1)
+		var sky_hor_day = Color(0.7, 0.8, 1.0)
+		var sky_hor_night = Color(0.1, 0.1, 0.2)
 		
-		var sky_color = night_sky.lerp(day_sky, strength if is_day else 0.0)
-		var horizon_color = sky_color.darkened(0.2)
+		# Horizon color becomes orange/pink during sunrise/sunset
+		var sunset_hor = Color(1.0, 0.4, 0.3)
+		var hor_weight = clamp(1.0 - abs(day_pos), 0.0, 1.0)
+		var current_hor = sky_hor_night.lerp(sky_hor_day, transition)
+		
+		if is_day:
+			current_hor = current_hor.lerp(sunset_hor, pow(hor_weight, 3.0))
 		
 		if env.sky and env.sky.sky_material:
-			env.sky.sky_material.sky_top_color = sky_color
-			env.sky.sky_material.sky_horizon_color = horizon_color
-			env.sky.sky_material.ground_bottom_color = horizon_color
-			env.sky.sky_material.ground_horizon_color = horizon_color
+			env.sky.sky_material.sky_top_color = sky_top_night.lerp(sky_top_day, transition)
+			env.sky.sky_material.sky_horizon_color = current_hor
+			env.sky.sky_material.ground_bottom_color = Color(0.1, 0.1, 0.1)
+			env.sky.sky_material.ground_horizon_color = current_hor
 		
-		env.ambient_light_energy = (strength * 0.25 + 0.1) if is_day else 0.08
-		env.ambient_light_color = Color(1, 1, 1).lerp(Color(0.3, 0.3, 0.5), 0.0 if is_day else 1.0)
+		# Ambient Lighting - Tuned for night visibility and softer days
+		env.ambient_light_energy = transition * 0.2 + 0.35
+		env.ambient_light_color = Color(0.6, 0.6, 0.7).lerp(Color(1, 1, 1), transition)
 		
-		# Adjust fog for atmospheric depth
-		pass
+		# Adjust fog if needed
+		env.background_energy_multiplier = transition * 0.5 + 0.4
 
 func _notification(what):
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:
@@ -738,6 +766,8 @@ func _setup_materials():
 		mat.albedo_texture = load("res://textures/sky/sun.png")
 		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+		mat.render_priority = -10
+		mat.no_depth_test = false
 		sun_node.material_override = mat
 		
 	var moon_node = get_node_or_null("CelestialBodies/Moon")
@@ -747,6 +777,8 @@ func _setup_materials():
 		mat.albedo_texture = load("res://textures/sky/moon.png")
 		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+		mat.render_priority = -10
+		mat.no_depth_test = false
 		moon_node.material_override = mat
 		
 	# Torch Mesh Setup
@@ -794,6 +826,7 @@ func _process(delta):
 	time += delta * TICKS_PER_SECOND
 	if time >= MAX_TIME:
 		time -= MAX_TIME
+		days_passed += 1
 	_update_sun_rotation()
 
 	if has_node("Player"):

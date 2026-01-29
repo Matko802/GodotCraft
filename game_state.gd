@@ -37,6 +37,36 @@ var fov = 75.0:
 		fov = value
 		settings_changed.emit()
 
+var master_volume = 1.0:
+	set(value):
+		master_volume = value
+		AudioServer.set_bus_volume_db(AudioServer.get_bus_index("Master"), linear_to_db(value))
+		settings_changed.emit()
+
+var blocks_volume = 1.0:
+	set(value):
+		blocks_volume = value
+		var bus_idx = AudioServer.get_bus_index("Blocks")
+		if bus_idx != -1:
+			AudioServer.set_bus_volume_db(bus_idx, linear_to_db(value))
+		settings_changed.emit()
+
+var damage_volume = 1.0:
+	set(value):
+		damage_volume = value
+		var bus_idx = AudioServer.get_bus_index("Damage")
+		if bus_idx != -1:
+			AudioServer.set_bus_volume_db(bus_idx, linear_to_db(value))
+		settings_changed.emit()
+
+var pickup_volume = 1.0:
+	set(value):
+		pickup_volume = value
+		var bus_idx = AudioServer.get_bus_index("Pickup")
+		if bus_idx != -1:
+			AudioServer.set_bus_volume_db(bus_idx, linear_to_db(value))
+		settings_changed.emit()
+
 var username = "Player"
 var is_slim = false:
 	set(value):
@@ -66,11 +96,20 @@ const SAVES_DIR = "user://saves/"
 const SKINS_DIR = "user://skins/"
 
 func _ready():
+	_ensure_audio_buses()
 	load_settings()
 	if not DirAccess.dir_exists_absolute(SAVES_DIR):
 		DirAccess.make_dir_absolute(SAVES_DIR)
 	if not DirAccess.dir_exists_absolute(SKINS_DIR):
 		DirAccess.make_dir_absolute(SKINS_DIR)
+
+func _ensure_audio_buses():
+	for bus_name in ["Blocks", "Damage", "Pickup"]:
+		if AudioServer.get_bus_index(bus_name) == -1:
+			var bus_count = AudioServer.bus_count
+			AudioServer.add_bus(bus_count)
+			AudioServer.set_bus_name(bus_count, bus_name)
+			AudioServer.set_bus_send(bus_count, "Master")
 
 func _input(event):
 	if event is InputEventKey and event.pressed and event.keycode == KEY_F11:
@@ -89,6 +128,10 @@ func save_settings():
 	config.set_value("Graphics", "vsync", vsync)
 	config.set_value("Graphics", "shadow_quality", shadow_quality)
 	config.set_value("Graphics", "fov", fov)
+	config.set_value("Audio", "master_volume", master_volume)
+	config.set_value("Audio", "blocks_volume", blocks_volume)
+	config.set_value("Audio", "damage_volume", damage_volume)
+	config.set_value("Audio", "pickup_volume", pickup_volume)
 	config.set_value("Player", "is_slim", is_slim)
 	config.set_value("Player", "custom_texture_path", custom_texture_path)
 	config.save(SETTINGS_PATH)
@@ -105,6 +148,10 @@ func load_settings():
 		vsync = config.get_value("Graphics", "vsync", true)
 		shadow_quality = config.get_value("Graphics", "shadow_quality", 2)
 		fov = config.get_value("Graphics", "fov", 75.0)
+		master_volume = config.get_value("Audio", "master_volume", 1.0)
+		blocks_volume = config.get_value("Audio", "blocks_volume", 1.0)
+		damage_volume = config.get_value("Audio", "damage_volume", 1.0)
+		pickup_volume = config.get_value("Audio", "pickup_volume", 1.0)
 		is_slim = config.get_value("Player", "is_slim", false)
 		custom_texture_path = config.get_value("Player", "custom_texture_path", "")
 	
