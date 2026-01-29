@@ -178,7 +178,16 @@ func _on_web_file_selected(args):
 		var reader = JavaScriptBridge.create_object("FileReader")
 		_web_reader_callback = JavaScriptBridge.create_callback(func(reader_args):
 			var result = reader_args[0].target.result
-			var bytes = JavaScriptBridge.create_object("Uint8Array", result)
+			
+			# Use eval to create a helper for Uint8Array creation to avoid bridge issues
+			JavaScriptBridge.eval("window._createUint8Array = (buf) => new Uint8Array(buf)")
+			var window = JavaScriptBridge.get_interface("window")
+			var bytes = window._createUint8Array(result)
+			
+			if not bytes:
+				print("Error: Could not create Uint8Array from buffer")
+				return
+				
 			var packed_bytes = PackedByteArray()
 			for i in range(bytes.length): packed_bytes.append(bytes[i])
 			var img = Image.new()
@@ -195,8 +204,7 @@ func _on_web_file_selected(args):
 				if state:
 					state.custom_texture_path = target_path
 					state.save_settings()
-					if username_input: # Reusing for path feedback if needed
-						print("Web skin loaded to skins folder")
+					print("Web skin loaded to skins folder")
 		)
 		reader.onload = _web_reader_callback
 		reader.readAsArrayBuffer(file)

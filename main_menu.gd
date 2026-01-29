@@ -31,7 +31,7 @@ extends Control
 @onready var shadows_label = find_child("ShadowsLabelUI", true) as Label
 @onready var msaa_button = find_child("MSAAOptionButtonUI", true) as OptionButton
 @onready var slim_checkbox = find_child("SlimModelCheckBoxUI", true) as CheckBox
-@onready var custom_texture_input = null
+@onready var custom_texture_input = find_child("CustomTextureInputUI", true) as LineEdit
 @onready var browse_texture_button = find_child("BrowseTextureButtonUI", true) as Button
 @onready var username_input = find_child("UsernameInputUI", true) as LineEdit
 @onready var settings_back_button = find_child("SettingsBackButtonUI", true) as Button
@@ -374,10 +374,18 @@ func _on_web_file_selected(args):
 		
 		_web_reader_callback = JavaScriptBridge.create_callback(func(reader_args):
 			var result = reader_args[0].target.result
-			var bytes = JavaScriptBridge.create_object("Uint8Array", result)
+			
+			# Use eval to create a helper for Uint8Array creation to avoid bridge issues
+			JavaScriptBridge.eval("window._createUint8Array = (buf) => new Uint8Array(buf)")
+			var window = JavaScriptBridge.get_interface("window")
+			var bytes = window._createUint8Array(result)
+			
+			if not bytes:
+				print("Error: Could not create Uint8Array from buffer")
+				return
+				
 			var packed_bytes = PackedByteArray()
-			# Optimization: Avoid large loops in GDScript if possible
-			# But for a small skin file it should be fine.
+			# For small files like skins, this loop is acceptable
 			for i in range(bytes.length):
 				packed_bytes.append(bytes[i])
 			
