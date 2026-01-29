@@ -1,8 +1,8 @@
-[gd_scene load_steps=2 format=3 uid="uid://2e70cch2asa7"]
+[gd_scene format=3 uid="uid://2e70cch2asa7"]
 
 [ext_resource type="Script" uid="uid://dw8wj37x8sum5" path="res://main_menu.gd" id="1_06t4h"]
 
-[node name="MainMenu" type="Control"]
+[node name="MainMenu" type="Control" unique_id=1401578875]
 process_mode = 3
 layout_mode = 3
 anchors_preset = 15
@@ -12,260 +12,264 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_06t4h")
 
-[node name="Background" type="ColorRect" parent="."]
+[node name="Background" type="ColorRect" parent="." unique_id=1443681852]
 layout_mode = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
 color = Color(0.1, 0.1, 0.1, 1)
 
-[node name="MainScreen" type="CenterContainer" parent="."]
+[node name="MainScreen" type="CenterContainer" parent="." unique_id=1499575377]
 layout_mode = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
 
-[node name="MenuPanel" type="PanelContainer" parent="MainScreen"]
+[node name="MenuPanel" type="PanelContainer" parent="MainScreen" unique_id=1411037727]
 custom_minimum_size = Vector2(300, 0)
 layout_mode = 2
 
-[node name="MenuMargin" type="MarginContainer" parent="MainScreen/MenuPanel"]
+[node name="MenuMargin" type="MarginContainer" parent="MainScreen/MenuPanel" unique_id=948706309]
 layout_mode = 2
 
-[node name="VBoxContainer" type="VBoxContainer" parent="MainScreen/MenuPanel/MenuMargin"]
+[node name="VBoxContainer" type="VBoxContainer" parent="MainScreen/MenuPanel/MenuMargin" unique_id=778439778]
 layout_mode = 2
 
-[node name="Title" type="Label" parent="MainScreen/MenuPanel/MenuMargin/VBoxContainer"]
+[node name="Title" type="Label" parent="MainScreen/MenuPanel/MenuMargin/VBoxContainer" unique_id=25379122]
 layout_mode = 2
 text = "GODOT CRAFT"
 horizontal_alignment = 1
 
-[node name="PlayButton" type="Button" parent="MainScreen/MenuPanel/MenuMargin/VBoxContainer"]
+[node name="PlayButton" type="Button" parent="MainScreen/MenuPanel/MenuMargin/VBoxContainer" unique_id=812362301]
 layout_mode = 2
 text = "Play"
 
-[node name="SettingsButton" type="Button" parent="MainScreen/MenuPanel/MenuMargin/VBoxContainer"]
+[node name="SettingsButton" type="Button" parent="MainScreen/MenuPanel/MenuMargin/VBoxContainer" unique_id=1292774583]
 layout_mode = 2
 text = "Settings"
 
-[node name="QuitButton" type="Button" parent="MainScreen/MenuPanel/MenuMargin/VBoxContainer"]
+[node name="QuitButton" type="Button" parent="MainScreen/MenuPanel/MenuMargin/VBoxContainer" unique_id=1292215969]
 layout_mode = 2
 text = "Quit"
 
-[node name="HSeparator" type="HSeparator" parent="MainScreen/MenuPanel/MenuMargin/VBoxContainer"]
+[node name="HSeparator" type="HSeparator" parent="MainScreen/MenuPanel/MenuMargin/VBoxContainer" unique_id=1256776128]
 layout_mode = 2
 
-[node name="PlayScreen" type="CenterContainer" parent="."]
+[node name="PlayScreen" type="CenterContainer" parent="." unique_id=450335037]
 visible = false
 layout_mode = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
 
-[node name="PanelContainer" type="PanelContainer" parent="PlayScreen"]
+[node name="PanelContainer" type="PanelContainer" parent="PlayScreen" unique_id=453826813]
 custom_minimum_size = Vector2(800, 500)
 layout_mode = 2
 
-[node name="VBoxContainer" type="VBoxContainer" parent="PlayScreen/PanelContainer"]
+[node name="VBoxContainer" type="VBoxContainer" parent="PlayScreen/PanelContainer" unique_id=1834615306]
 layout_mode = 2
 
-[node name="TabContainer" type="TabContainer" parent="PlayScreen/PanelContainer/VBoxContainer"]
+[node name="TabContainer" type="TabContainer" parent="PlayScreen/PanelContainer/VBoxContainer" unique_id=1831494518]
 layout_mode = 2
 size_flags_vertical = 3
 current_tab = 0
 
-[node name="CreateWorld" type="VBoxContainer" parent="PlayScreen/PanelContainer/VBoxContainer/TabContainer"]
+[node name="CreateWorld" type="VBoxContainer" parent="PlayScreen/PanelContainer/VBoxContainer/TabContainer" unique_id=1551059779]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 metadata/_tab_index = 0
 
-[node name="NameInputUI" type="LineEdit" parent="PlayScreen/PanelContainer/VBoxContainer/TabContainer/CreateWorld"]
+[node name="NameInputUI" type="LineEdit" parent="PlayScreen/PanelContainer/VBoxContainer/TabContainer/CreateWorld" unique_id=2074298027]
 layout_mode = 2
 placeholder_text = "World Name"
 
-[node name="SeedInputUI" type="LineEdit" parent="PlayScreen/PanelContainer/VBoxContainer/TabContainer/CreateWorld"]
+[node name="SeedInputUI" type="LineEdit" parent="PlayScreen/PanelContainer/VBoxContainer/TabContainer/CreateWorld" unique_id=544322857]
 layout_mode = 2
 placeholder_text = "Seed (Optional)"
 
-[node name="CreateButtonUI" type="Button" parent="PlayScreen/PanelContainer/VBoxContainer/TabContainer/CreateWorld"]
+[node name="CreateButtonUI" type="Button" parent="PlayScreen/PanelContainer/VBoxContainer/TabContainer/CreateWorld" unique_id=1802251706]
 layout_mode = 2
 text = "Create World"
 
-[node name="LoadWorld" type="HBoxContainer" parent="PlayScreen/PanelContainer/VBoxContainer/TabContainer"]
+[node name="LoadWorld" type="HBoxContainer" parent="PlayScreen/PanelContainer/VBoxContainer/TabContainer" unique_id=1175420210]
 visible = false
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 metadata/_tab_index = 1
 
-[node name="SaveListUI" type="ItemList" parent="PlayScreen/PanelContainer/VBoxContainer/TabContainer/LoadWorld"]
+[node name="SaveListUI" type="ItemList" parent="PlayScreen/PanelContainer/VBoxContainer/TabContainer/LoadWorld" unique_id=587475676]
 custom_minimum_size = Vector2(300, 400)
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="PreviewPanel" type="VBoxContainer" parent="PlayScreen/PanelContainer/VBoxContainer/TabContainer/LoadWorld"]
+[node name="PreviewPanel" type="VBoxContainer" parent="PlayScreen/PanelContainer/VBoxContainer/TabContainer/LoadWorld" unique_id=1144291447]
 custom_minimum_size = Vector2(300, 0)
 layout_mode = 2
 
-[node name="ThumbnailUI" type="TextureRect" parent="PlayScreen/PanelContainer/VBoxContainer/TabContainer/LoadWorld/PreviewPanel"]
+[node name="ThumbnailUI" type="TextureRect" parent="PlayScreen/PanelContainer/VBoxContainer/TabContainer/LoadWorld/PreviewPanel" unique_id=2132902293]
 custom_minimum_size = Vector2(280, 160)
 layout_mode = 2
 expand_mode = 1
 stretch_mode = 6
 
-[node name="WorldInfoLabel" type="Label" parent="PlayScreen/PanelContainer/VBoxContainer/TabContainer/LoadWorld/PreviewPanel"]
+[node name="WorldInfoLabel" type="Label" parent="PlayScreen/PanelContainer/VBoxContainer/TabContainer/LoadWorld/PreviewPanel" unique_id=216959333]
 layout_mode = 2
 text = "Select a world"
 
-[node name="HBoxContainer" type="HBoxContainer" parent="PlayScreen/PanelContainer/VBoxContainer/TabContainer/LoadWorld/PreviewPanel"]
+[node name="HBoxContainer" type="HBoxContainer" parent="PlayScreen/PanelContainer/VBoxContainer/TabContainer/LoadWorld/PreviewPanel" unique_id=235369788]
 layout_mode = 2
 
-[node name="LoadButtonUI" type="Button" parent="PlayScreen/PanelContainer/VBoxContainer/TabContainer/LoadWorld/PreviewPanel/HBoxContainer"]
+[node name="LoadButtonUI" type="Button" parent="PlayScreen/PanelContainer/VBoxContainer/TabContainer/LoadWorld/PreviewPanel/HBoxContainer" unique_id=88974228]
 layout_mode = 2
 text = "Load Selected"
 
-[node name="DeleteButtonUI" type="Button" parent="PlayScreen/PanelContainer/VBoxContainer/TabContainer/LoadWorld/PreviewPanel/HBoxContainer"]
+[node name="DeleteButtonUI" type="Button" parent="PlayScreen/PanelContainer/VBoxContainer/TabContainer/LoadWorld/PreviewPanel/HBoxContainer" unique_id=644384187]
 layout_mode = 2
 text = "Delete"
 
-[node name="PlayBackButton" type="Button" parent="PlayScreen/PanelContainer/VBoxContainer"]
+[node name="PlayBackButton" type="Button" parent="PlayScreen/PanelContainer/VBoxContainer" unique_id=799843265]
 layout_mode = 2
 text = "Back"
 
-[node name="SettingsScreen" type="CenterContainer" parent="."]
+[node name="SettingsScreen" type="CenterContainer" parent="." unique_id=811147518]
 visible = false
 layout_mode = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
 
-[node name="PanelContainer2" type="PanelContainer" parent="SettingsScreen"]
+[node name="PanelContainer2" type="PanelContainer" parent="SettingsScreen" unique_id=2136835760]
 custom_minimum_size = Vector2(600, 500)
 layout_mode = 2
 
-[node name="SettingsMargin" type="MarginContainer" parent="SettingsScreen/PanelContainer2"]
+[node name="SettingsMargin" type="MarginContainer" parent="SettingsScreen/PanelContainer2" unique_id=2062030769]
 layout_mode = 2
 
-[node name="VBoxContainer" type="VBoxContainer" parent="SettingsScreen/PanelContainer2/SettingsMargin"]
+[node name="VBoxContainer" type="VBoxContainer" parent="SettingsScreen/PanelContainer2/SettingsMargin" unique_id=1044244205]
 layout_mode = 2
 
-[node name="SettingsTitle" type="Label" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer"]
+[node name="SettingsTitle" type="Label" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer" unique_id=2047583811]
 layout_mode = 2
 text = "SETTINGS"
 horizontal_alignment = 1
 
-[node name="SettingsScroll" type="ScrollContainer" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer"]
+[node name="SettingsScroll" type="ScrollContainer" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer" unique_id=2068935584]
 layout_mode = 2
 size_flags_vertical = 3
 
-[node name="SettingsList" type="VBoxContainer" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll"]
+[node name="SettingsList" type="VBoxContainer" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll" unique_id=2084032165]
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="GeneralSectionLabel" type="Label" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList"]
+[node name="GeneralSectionLabel" type="Label" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList" unique_id=1229951333]
 layout_mode = 2
 text = "--- General ---"
 horizontal_alignment = 1
 
-[node name="UsernameHBox" type="HBoxContainer" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList"]
+[node name="UsernameHBox" type="HBoxContainer" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList" unique_id=884994089]
 layout_mode = 2
 
-[node name="UsernameLabelUI" type="Label" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList/UsernameHBox"]
+[node name="UsernameLabelUI" type="Label" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList/UsernameHBox" unique_id=723995222]
 layout_mode = 2
 text = "Username: 	"
 
-[node name="UsernameInputUI" type="LineEdit" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList/UsernameHBox"]
+[node name="UsernameInputUI" type="LineEdit" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList/UsernameHBox" unique_id=1830627370]
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="GraphicsSectionLabel" type="Label" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList"]
+[node name="GraphicsSectionLabel" type="Label" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList" unique_id=1911146642]
 layout_mode = 2
 text = "--- Graphics ---"
 horizontal_alignment = 1
 
-[node name="FullscreenCheckBoxUI" type="CheckBox" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList"]
+[node name="FullscreenCheckBoxUI" type="CheckBox" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList" unique_id=1420771594]
 layout_mode = 2
 text = "Borderless Fullscreen"
 
-[node name="RenderDistanceHBox" type="HBoxContainer" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList"]
+[node name="RenderDistanceHBox" type="HBoxContainer" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList" unique_id=154470430]
 layout_mode = 2
 
-[node name="RenderDistanceLabelUI" type="Label" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList/RenderDistanceHBox"]
+[node name="RenderDistanceLabelUI" type="Label" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList/RenderDistanceHBox" unique_id=1165319817]
 custom_minimum_size = Vector2(250, 0)
 layout_mode = 2
 text = "Render Distance: 4"
 
-[node name="RenderDistanceSliderUI" type="HSlider" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList/RenderDistanceHBox"]
+[node name="RenderDistanceSliderUI" type="HSlider" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList/RenderDistanceHBox" unique_id=202906176]
 layout_mode = 2
 size_flags_horizontal = 3
 min_value = 2.0
 max_value = 16.0
 value = 4.0
 
-[node name="FOVHBox" type="HBoxContainer" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList"]
+[node name="FOVHBox" type="HBoxContainer" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList" unique_id=595153767]
 layout_mode = 2
 
-[node name="FOVLabelUI" type="Label" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList/FOVHBox"]
+[node name="FOVLabelUI" type="Label" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList/FOVHBox" unique_id=1229382220]
 custom_minimum_size = Vector2(250, 0)
 layout_mode = 2
 text = "FOV: 75"
 
-[node name="FOVSliderUI" type="HSlider" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList/FOVHBox"]
+[node name="FOVSliderUI" type="HSlider" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList/FOVHBox" unique_id=964104719]
 layout_mode = 2
 size_flags_horizontal = 3
 min_value = 30.0
 max_value = 110.0
 value = 75.0
 
-[node name="SlimModelCheckBoxUI" type="CheckBox" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList"]
+[node name="SlimModelCheckBoxUI" type="CheckBox" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList" unique_id=1261302249]
 layout_mode = 2
 text = "Slim Player Model"
 
-[node name="CustomTextureHBox" type="HBoxContainer" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList"]
+[node name="CustomTextureHBox" type="HBoxContainer" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList" unique_id=1987675511]
 layout_mode = 2
 
-[node name="CustomTextureLabelUI" type="Label" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList/CustomTextureHBox"]
+[node name="CustomTextureLabelUI" type="Label" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList/CustomTextureHBox" unique_id=1294653255]
 layout_mode = 2
 text = "Custom Texture Path: 	"
 
-[node name="CustomTextureInputUI" type="LineEdit" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList/CustomTextureHBox"]
+[node name="CustomTextureInputUI" type="LineEdit" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList/CustomTextureHBox" unique_id=847386272]
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="VSyncHBox" type="HBoxContainer" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList"]
+[node name="BrowseTextureButtonUI" type="Button" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList/CustomTextureHBox" unique_id=432330336]
+layout_mode = 2
+text = "Browse"
+
+[node name="VSyncHBox" type="HBoxContainer" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList" unique_id=253239378]
 layout_mode = 2
 
-[node name="VSyncLabelUI" type="Label" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList/VSyncHBox"]
+[node name="VSyncLabelUI" type="Label" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList/VSyncHBox" unique_id=1563079967]
 layout_mode = 2
 text = "VSync:"
 
-[node name="VSyncCheckBoxUI" type="CheckBox" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList/VSyncHBox"]
+[node name="VSyncCheckBoxUI" type="CheckBox" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList/VSyncHBox" unique_id=673095432]
 layout_mode = 2
 
-[node name="ShadowsHBox" type="HBoxContainer" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList"]
+[node name="ShadowsHBox" type="HBoxContainer" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList" unique_id=1694464827]
 layout_mode = 2
 
-[node name="ShadowsLabelUI" type="Label" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList/ShadowsHBox"]
+[node name="ShadowsLabelUI" type="Label" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList/ShadowsHBox" unique_id=1987744801]
 layout_mode = 2
 text = "Shadows:"
 
-[node name="ShadowsSliderUI" type="HSlider" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList/ShadowsHBox"]
+[node name="ShadowsSliderUI" type="HSlider" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList/ShadowsHBox" unique_id=1218978062]
 layout_mode = 2
 size_flags_horizontal = 3
 max_value = 4.0
 
-[node name="MSAAHBox" type="HBoxContainer" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList"]
+[node name="MSAAHBox" type="HBoxContainer" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList" unique_id=711642503]
 layout_mode = 2
 
-[node name="MSAALabelUI" type="Label" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList/MSAAHBox"]
+[node name="MSAALabelUI" type="Label" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList/MSAAHBox" unique_id=383300066]
 layout_mode = 2
 text = "Anti-Aliasing:"
 
-[node name="MSAAOptionButtonUI" type="OptionButton" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList/MSAAHBox"]
+[node name="MSAAOptionButtonUI" type="OptionButton" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer/SettingsScroll/SettingsList/MSAAHBox" unique_id=1257122844]
 layout_mode = 2
 
-[node name="SettingsBackButtonUI" type="Button" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer"]
+[node name="SettingsBackButtonUI" type="Button" parent="SettingsScreen/PanelContainer2/SettingsMargin/VBoxContainer" unique_id=1992080723]
 layout_mode = 2
 text = "Back"
 
-[node name="VersionLabel" type="Label" parent="."]
+[node name="VersionLabel" type="Label" parent="." unique_id=1680041473]
 layout_mode = 0
 anchor_left = 1.0
 anchor_top = 1.0

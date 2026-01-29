@@ -11,6 +11,10 @@ extends Control
 @onready var shadows_slider = find_child("ShadowsSliderUI", true) as HSlider
 @onready var shadows_label = find_child("ShadowsLabelUI", true) as Label
 @onready var msaa_button = find_child("MSAAOptionButtonUI", true) as OptionButton
+@onready var slim_checkbox = find_child("SlimModelCheckBoxUI", true) as CheckBox
+@onready var custom_texture_input = find_child("CustomTextureInputUI", true) as LineEdit
+@onready var browse_texture_button = find_child("BrowseTextureButtonUI", true) as Button
+@onready var username_input = find_child("UsernameInputUI", true) as LineEdit
 
 func _ready():
 	visible = false
@@ -33,10 +37,52 @@ func _ready():
 	msaa_button.add_item("8x", 3)
 	msaa_button.item_selected.connect(_on_msaa_selected)
 	
+	slim_checkbox.toggled.connect(_on_slim_toggled)
+	custom_texture_input.text_changed.connect(_on_custom_texture_changed)
+	browse_texture_button.pressed.connect(_on_browse_texture_pressed)
+	username_input.text_changed.connect(_on_username_changed)
+	
+	_style_ui()
+	
 	var state = get_node_or_null("/root/GameState")
 	if state:
 		state.settings_changed.connect(_on_external_settings_changed)
 		_refresh_ui_from_state()
+
+func _style_ui():
+	# Find all relevant nodes in the settings list
+	var settings_list = find_child("SettingsList", true)
+	if not settings_list: return
+	
+	var nodes = []
+	var stack = [settings_list]
+	# Also include main content buttons
+	stack.append(main_content)
+	stack.append(find_child("BackButtonUI", true))
+	
+	while stack.size() > 0:
+		var node = stack.pop_back()
+		if node == null: continue
+		nodes.append(node)
+		for child in node.get_children():
+			stack.push_back(child)
+			
+	for node in nodes:
+		if node is Button:
+			node.add_theme_font_size_override("font_size", 24)
+			node.custom_minimum_size.y = 50
+		elif node is Label:
+			node.add_theme_font_size_override("font_size", 20)
+		elif node is LineEdit:
+			node.add_theme_font_size_override("font_size", 20)
+			node.custom_minimum_size.y = 40
+		elif node is CheckBox:
+			node.add_theme_font_size_override("font_size", 20)
+		elif node is OptionButton:
+			node.add_theme_font_size_override("font_size", 20)
+			node.custom_minimum_size.y = 40
+		elif node is HSlider:
+			node.custom_minimum_size.y = 30
 
 func _refresh_ui_from_state():
 	var state = get_node_or_null("/root/GameState")
@@ -51,6 +97,9 @@ func _refresh_ui_from_state():
 	shadows_slider.set_value_no_signal(state.shadow_quality)
 	_update_shadows_label(state.shadow_quality)
 	msaa_button.selected = state.msaa
+	slim_checkbox.set_pressed_no_signal(state.is_slim)
+	custom_texture_input.text = state.custom_texture_path
+	username_input.text = state.username
 
 func _on_external_settings_changed():
 	_refresh_ui_from_state()
@@ -84,6 +133,48 @@ func _on_msaa_selected(index):
 		state.msaa = index
 		state.save_settings()
 		state._apply_graphics_settings()
+
+func _on_slim_toggled(toggled_on):
+	var state = get_node_or_null("/root/GameState")
+	if state:
+		state.is_slim = toggled_on
+		state.save_settings()
+
+func _on_custom_texture_changed(new_path):
+	var state = get_node_or_null("/root/GameState")
+	if state:
+		state.custom_texture_path = new_path
+		state.save_settings()
+
+func _on_username_changed(new_username):
+	var state = get_node_or_null("/root/GameState")
+	if state:
+		state.username = new_username
+		state.save_settings()
+
+func _on_browse_texture_pressed():
+	var filters = ["*.png", "*.jpg", "*.jpeg", "*.tga", "*.bmp", "*.webp"]
+	DisplayServer.file_dialog_show("Open Player Texture", "", "", false, DisplayServer.FILE_DIALOG_MODE_OPEN_FILE, filters, _on_file_selected)
+
+func _on_file_selected(status: bool, selected_paths: PackedStringArray, _selected_filter_index: int):
+	if not status or selected_paths.is_empty():
+		return
+		
+	var path = selected_paths[0]
+	var img = Image.load_from_file(path)
+	if img:
+		var ext = path.get_extension()
+		var target_path = "user://custom_skin." + ext
+		var err = img.save_png(target_path) if ext.to_lower() == "png" else img.save_webp(target_path)
+		
+		if err == OK:
+			var state = get_node_or_null("/root/GameState")
+			if state:
+				state.custom_texture_path = target_path
+				state.save_settings()
+				custom_texture_input.text = target_path
+		else:
+			print("Error saving custom skin: ", err)
 
 func _on_resume_pressed():
 	visible = false

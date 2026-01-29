@@ -5,7 +5,7 @@ extends Node3D
 @export var world_seed = "GodotCraft"
 @export var render_distance = 4
 
-enum BlockType { STONE, DIRT, GRASS, SAND, BEDROCK, WOOD, LEAVES, WATER, WATER_FLOW, TORCH }
+enum BlockType { STONE, DIRT, GRASS, SAND, BEDROCK, WOOD, LEAVES, WATER, WATER_FLOW, TORCH, COARSE_DIRT }
 
 const BLOCK_TEXTURES = {
 	0: "res://textures/stone.png",
@@ -15,7 +15,8 @@ const BLOCK_TEXTURES = {
 	4: "res://textures/bedrock.png",
 	5: "res://textures/oak_wood_side.png",
 	6: "res://textures/leaves.png",
-	9: "res://models/block/torch/torch_0.png"
+	9: "res://models/block/torch/torch_0.png",
+	10: "res://textures/dirt.png" # Placeholder for coarse dirt if not present
 }
 
 const BLOCK_SOUNDS = {
@@ -61,7 +62,8 @@ const TYPE_TO_SOUND = {
 	BlockType.SAND: "sand",
 	BlockType.WOOD: "wood",
 	BlockType.LEAVES: "grass",
-	BlockType.TORCH: "wood"
+	BlockType.TORCH: "wood",
+	BlockType.COARSE_DIRT: "gravel"
 }
 
 const DROPPED_ITEM_SCENE = preload("res://dropped_item.tscn")
@@ -79,9 +81,6 @@ var water_timer = 0.0
 var water_update_queue = {} # Using dictionary as a set: {Vector3i: bool}
 var water_tick_timer = 0.0
 var water_frame = 0
-
-var _autosave_timer = 0.0
-const AUTOSAVE_INTERVAL = 300.0 # 5 minutes
 
 enum LoadingStage { ASSETS, CHUNKS }
 var _current_stage = LoadingStage.ASSETS
@@ -350,6 +349,7 @@ func _enter_tree():
 
 func _ready():
 	add_to_group("world")
+	get_tree().set_auto_accept_quit(false)
 	
 	_gather_assets()
 	
@@ -608,32 +608,44 @@ func _update_sun_rotation():
 		# Adjust fog for atmospheric depth
 		pass
 
-func save_game():
+func _notification(what):
+	if what == NOTIFICATION_WM_CLOSE_REQUEST:
+		if not is_loading:
+			# If we are in a world, try to save
+			var state = get_node_or_null("/root/GameState")
+			if state and state.current_save_name != "":
+				# Save without screenshot for faster closing
+				await save_game(true)
+		get_tree().quit()
+
+func save_game(data_only: bool = false):
 	var state = get_node_or_null("/root/GameState")
 	if state and state.current_save_name != "":
-		# Hide UI for screenshot
-		var hud = get_node_or_null("Player/HUD")
-		var pause_layer = get_node_or_null("Player/PauseLayer")
-		var player = get_tree().get_first_node_in_group("player")
-		var view_model = null
-		if player:
-			view_model = player.get_node_or_null("SpringArm3D/Camera3D/ViewModelArm")
+		var img = null
+		if not data_only:
+			# Hide UI for screenshot
+			var hud = get_node_or_null("Player/HUD")
+			var pause_layer = get_node_or_null("Player/PauseLayer")
+			var player = get_tree().get_first_node_in_group("player")
+			var view_model = null
+			if player:
+				view_model = player.get_node_or_null("SpringArm3D/Camera3D/ViewModelArm")
+				
+			if hud: hud.visible = false
+			if pause_layer: pause_layer.visible = false
+			if view_model: view_model.visible = false
 			
-		if hud: hud.visible = false
-		if pause_layer: pause_layer.visible = false
-		if view_model: view_model.visible = false
-		
-		# Wait for render frame to ensure UI is hidden in capture
-		await RenderingServer.frame_post_draw
-		
-		var img = get_viewport().get_texture().get_image()
-		# Resize to small thumbnail to speed up save_png
-		img.resize(320, 180, Image.INTERPOLATE_LANCZOS)
-		
-		# Restore UI immediately so user doesn't see flicker
-		if hud: hud.visible = true
-		if pause_layer: pause_layer.visible = true
-		if view_model: view_model.visible = player.current_camera_mode == player.CameraMode.FIRST_PERSON
+			# Wait for render frame to ensure UI is hidden in capture
+			await RenderingServer.frame_post_draw
+			
+			img = get_viewport().get_texture().get_image()
+			# Resize to small thumbnail to speed up save_png
+			img.resize(320, 180, Image.INTERPOLATE_LANCZOS)
+			
+			# Restore UI immediately so user doesn't see flicker
+			if hud: hud.visible = true
+			if pause_layer: pause_layer.visible = true
+			if view_model: view_model.visible = player.current_camera_mode == player.CameraMode.FIRST_PERSON
 
 		var inv_data = {"hotbar": [], "inventory": []}
 		if has_node("Player/Inventory"):
@@ -674,7 +686,8 @@ func save_game():
 		
 		# Use WorkerThreadPool for background saving to prevent freeze
 		WorkerThreadPool.add_task(func():
-			img.save_png(thumb_path)
+			if img:
+				img.save_png(thumb_path)
 			var inner_state = instance_from_id(state_id)
 			if inner_state:
 				inner_state.save_game(save_name, data)
@@ -791,15 +804,6 @@ func _process(delta):
 	if time >= MAX_TIME:
 		time -= MAX_TIME
 	_update_sun_rotation()
-
-	# Update autosave timer
-	_autosave_timer += delta
-	if _autosave_timer >= AUTOSAVE_INTERVAL:
-		_autosave_timer = 0.0
-		save_game()
-		var player = get_tree().get_first_node_in_group("player")
-		if player and player.chat_ui:
-			player.chat_ui.add_message("[color=gray]Autosaving...[/color]")
 
 	if has_node("Player"):
 		var player_pos = $Player.global_position
@@ -1112,6 +1116,7 @@ func create_chunk(cx, cz):
 func _threaded_mesh_gen(cx, cz, c_size):
 	var c_pos = Vector2i(cx, cz)
 	var self_id = get_instance_id()
+	var world = instance_from_id(self_id)
 	var mesh_results = {} # type -> { "verts": [], ... }
 	
 	# Important: Snapshot the data inside the mutex
@@ -1131,7 +1136,6 @@ func _threaded_mesh_gen(cx, cz, c_size):
 	
 	var current_chunk_data = relevant_chunks.get(c_pos, {})
 	if current_chunk_data.is_empty():
-		var world = instance_from_id(self_id)
 		if is_instance_valid(world):
 			world.call_deferred("_apply_chunk_mesh", cx, cz, [], [])
 		return
@@ -1219,7 +1223,6 @@ func _threaded_mesh_gen(cx, cz, c_size):
 			"col_verts": res.col_verts
 		})
 							
-	var world = instance_from_id(self_id)
 	if is_instance_valid(world):
 		world.call_deferred("_apply_chunk_mesh", cx, cz, final_results, decoration_positions)
 

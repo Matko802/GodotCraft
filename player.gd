@@ -41,7 +41,7 @@ var walk_time = 0.0
 var idle_time = 0.0
 var is_swinging = false
 var swing_progress = 0.0
-const SWING_SPEED = 8.0
+const SWING_SPEED = 4.0
 
 var _hand_light_ref: OmniLight3D = null
 var _viewmodel_light_ref: OmniLight3D = null
@@ -135,6 +135,24 @@ var world = null
 var selected_slot = 0
 var selection_box: MeshInstance3D
 
+var mining_progress = 0.0
+var current_mining_pos = Vector3i(-1, -1, -1)
+var breaking_mesh: MeshInstance3D
+var breaking_textures = []
+var mining_sound_timer = 0.0
+
+const MINING_TIMES = {
+	0: 1.5, # STONE
+	1: 0.5, # DIRT
+	2: 0.6, # GRASS
+	3: 0.5, # SAND
+	4: -1.0, # BEDROCK
+	5: 1.5, # WOOD
+	6: 0.1, # LEAVES
+	9: 0.0, # TORCH
+	10: 0.5 # COARSE_DIRT
+}
+
 var _was_on_floor = false
 var _fall_start_y = 0.0
 var _void_damage_timer = 0.0
@@ -157,6 +175,7 @@ func _ready():
 	world = get_parent()
 	
 	_setup_selection_box()
+	_setup_breaking_mesh()
 	_setup_player_model()
 	_setup_view_model()
 	
@@ -207,7 +226,6 @@ var camera_pitch = 0.0
 func _setup_player_model():
 	var state = get_node_or_null("/root/GameState")
 	var is_slim = state.is_slim if state else false
-	var tex_path = state.custom_texture_path if state and state.custom_texture_path != "" else ("res://models/player/slim/model_0.png" if is_slim else "res://models/player/wide/model_0.png")
 	
 	# Replace model if type changed
 	var model_path = "res://models/player/slim/model.gltf" if is_slim else "res://models/player/wide/model.gltf"
@@ -266,13 +284,16 @@ func _setup_player_model():
 
 	# Apply texture
 	var texture = null
-	if tex_path.begins_with("res://"):
-		texture = load(tex_path)
-	elif FileAccess.file_exists(tex_path):
-		var img = Image.load_from_file(tex_path)
-		texture = ImageTexture.create_from_image(img)
+	var custom_path = state.custom_texture_path if state else ""
 	
-	if not texture: texture = load("res://models/player/wide/model_0.png")
+	if custom_path != "" and (custom_path.begins_with("user://") or FileAccess.file_exists(custom_path)):
+		var img = Image.load_from_file(custom_path)
+		if img:
+			texture = ImageTexture.create_from_image(img)
+	
+	if not texture:
+		var tex_path = "res://models/player/slim/model_0.png" if is_slim else "res://models/player/wide/model_0.png"
+		texture = load(tex_path)
 	
 	var mat = StandardMaterial3D.new()
 	mat.albedo_texture = texture
@@ -331,6 +352,53 @@ func _setup_selection_box():
 	selection_box.top_level = true
 	selection_box.visible = false
 
+func _setup_breaking_mesh():
+	# Load breaking animation textures
+	for i in range(10):
+		var tex = load("res://textures/breaking animation/destroy_stage_" + str(i) + ".png")
+		breaking_textures.append(tex)
+	
+	breaking_mesh = MeshInstance3D.new()
+	
+	# Manually construct a box mesh to ensure perfect per-face UV cloning
+	var st = SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	
+	var s = 0.505 # Half-size with small buffer to prevent z-fighting
+	var faces = [
+		[Vector3(-s, s, -s), Vector3(s, s, -s), Vector3(s, s, s), Vector3(-s, s, s)], # Top
+		[Vector3(-s, -s, s), Vector3(s, -s, s), Vector3(s, -s, -s), Vector3(-s, -s, -s)], # Bottom
+		[Vector3(-s, s, -s), Vector3(-s, s, s), Vector3(-s, -s, s), Vector3(-s, -s, -s)], # Left
+		[Vector3(s, s, s), Vector3(s, s, -s), Vector3(s, -s, -s), Vector3(s, -s, s)], # Right
+		[Vector3(s, s, -s), Vector3(-s, s, -s), Vector3(-s, -s, -s), Vector3(s, -s, -s)], # Front
+		[Vector3(-s, s, s), Vector3(s, s, s), Vector3(s, -s, s), Vector3(-s, -s, s)], # Back
+	]
+	
+	for f in faces:
+		# Triangle 1
+		st.set_uv(Vector2(0,0)); st.add_vertex(f[0])
+		st.set_uv(Vector2(1,0)); st.add_vertex(f[1])
+		st.set_uv(Vector2(1,1)); st.add_vertex(f[2])
+		# Triangle 2
+		st.set_uv(Vector2(0,0)); st.add_vertex(f[0])
+		st.set_uv(Vector2(1,1)); st.add_vertex(f[2])
+		st.set_uv(Vector2(0,1)); st.add_vertex(f[3])
+		
+	breaking_mesh.mesh = st.commit()
+	
+	var mat = StandardMaterial3D.new()
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.albedo_texture = breaking_textures[0]
+	mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+	mat.render_priority = 11
+	breaking_mesh.material_override = mat
+	breaking_mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	
+	add_child(breaking_mesh)
+	breaking_mesh.top_level = true
+	breaking_mesh.visible = false
+
 func _setup_view_model():
 	if not view_model_arm: return
 	
@@ -339,15 +407,17 @@ func _setup_view_model():
 	
 	# Initial visibility handled by _update_held_item_mesh
 	# Setup Materials for hands
-	var tex_path = state.custom_texture_path if state and state.custom_texture_path != "" else ("res://models/player/slim/slimhand_0.png" if is_slim else "res://models/player/wide/widehand_0.png")
 	var texture = null
-	if tex_path.begins_with("res://"):
-		texture = load(tex_path)
-	elif FileAccess.file_exists(tex_path):
-		var img = Image.load_from_file(tex_path)
-		texture = ImageTexture.create_from_image(img)
+	var custom_path = state.custom_texture_path if state else ""
+	
+	if custom_path != "" and (custom_path.begins_with("user://") or FileAccess.file_exists(custom_path)):
+		var img = Image.load_from_file(custom_path)
+		if img:
+			texture = ImageTexture.create_from_image(img)
+	
 	if not texture: 
-		texture = load("res://models/player/slim/slimhand_0.png" if is_slim else "res://models/player/wide/widehand_0.png")
+		var tex_path = "res://models/player/slim/slimhand_0.png" if is_slim else "res://models/player/wide/widehand_0.png"
+		texture = load(tex_path)
 
 	var hand_mat = ShaderMaterial.new()
 	hand_mat.shader = load("res://viewmodel.gdshader")
@@ -533,6 +603,7 @@ func _process(delta):
 	
 	_update_swing(delta)
 	_update_selection_box()
+	_update_mining(delta)
 	_animate_walk(delta)
 	_update_view_model(delta)
 
@@ -544,6 +615,76 @@ func _process(delta):
 	# Fallback safety: If we are stuck in a block, reset fall damage to prevent unfair death
 	if get_last_slide_collision() != null and not is_on_floor() and velocity.length() < 1.0:
 		_fall_start_y = global_position.y
+
+func _update_mining(delta):
+	var state = get_node_or_null("/root/GameState")
+	var is_creative = state and state.gamemode == state.GameMode.CREATIVE
+	
+	if Input.is_action_pressed("attack") and raycast.is_colliding() and not is_creative:
+		var pos = raycast.get_collision_point() - raycast.get_collision_normal() * 0.1
+		var block_pos = Vector3i(floor(pos.x), floor(pos.y), floor(pos.z))
+		var type = world.get_block(block_pos)
+		
+		# Type 7 and 8 are water
+		if type >= 0 and type != 7 and type != 8:
+			var duration = MINING_TIMES.get(type, 1.5)
+			
+			if duration < 0: # Unbreakable
+				_reset_mining()
+				return
+				
+			if block_pos != current_mining_pos:
+				current_mining_pos = block_pos
+				mining_progress = 0.0
+				mining_sound_timer = 0.0
+				
+			if duration == 0: # Instant
+				_finish_mining(block_pos, type)
+				return
+				
+			mining_progress += delta
+			mining_sound_timer -= delta
+			
+			if not is_swinging:
+				swing()
+			
+			if mining_sound_timer <= 0:
+				world.play_break_sound(Vector3(block_pos), type)
+				mining_sound_timer = 0.3 # Minecraft-like hit frequency
+			
+			# Visuals
+			breaking_mesh.global_position = Vector3(block_pos) + Vector3(0.5, 0.5, 0.5)
+			breaking_mesh.visible = true
+			
+			var stage = int((mining_progress / duration) * 10)
+			stage = clamp(stage, 0, 9)
+			breaking_mesh.material_override.albedo_texture = breaking_textures[stage]
+			
+			if mining_progress >= duration:
+				_finish_mining(block_pos, type)
+		else:
+			_reset_mining()
+	else:
+		_reset_mining()
+
+func _finish_mining(block_pos, type):
+	var state_gm = get_node_or_null("/root/GameState")
+	var is_creative_mode = state_gm and state_gm.gamemode == state_gm.GameMode.CREATIVE
+	
+	swing()
+	
+	if not is_creative_mode:
+		inventory.spawn_dropped_item(type, 1, Vector3(block_pos) + Vector3(0.5, 0.5, 0.5), world)
+	
+	world.remove_block(block_pos)
+	_reset_mining()
+
+func _reset_mining():
+	mining_progress = 0.0
+	mining_sound_timer = 0.0
+	current_mining_pos = Vector3i(-1, -1, -1)
+	if breaking_mesh:
+		breaking_mesh.visible = false
 
 func _update_swing(delta):
 	if is_swinging:
@@ -724,7 +865,10 @@ func _unhandled_input(event):
 		_apply_rotations()
 	
 	if event is InputEventMouseButton and event.pressed:
-		if event.button_index == MOUSE_BUTTON_LEFT: _break_block()
+		if event.button_index == MOUSE_BUTTON_LEFT: 
+			var state_gm = get_node_or_null("/root/GameState")
+			if state_gm and state_gm.gamemode == state_gm.GameMode.CREATIVE:
+				_break_block()
 		elif event.button_index == MOUSE_BUTTON_RIGHT: _place_block()
 		elif event.button_index == MOUSE_BUTTON_MIDDLE: _pick_block()
 		elif event.button_index == MOUSE_BUTTON_WHEEL_UP:

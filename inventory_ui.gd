@@ -182,6 +182,11 @@ func setup(player):
 		slot.mouse_entered.connect(_on_slot_mouse_entered.bind(slot))
 		slot.mouse_exited.connect(_on_slot_mouse_exited.bind(slot))
 	
+	if not hotbar_container.sort_children.is_connected(_update_selection_outline):
+		hotbar_container.sort_children.connect(_update_selection_outline)
+	if not hotbar_container.sort_children.is_connected(_update_hearts_position):
+		hotbar_container.sort_children.connect(_update_hearts_position)
+	
 	# Create Main Inventory slots
 	for i in range(inventory_ref.INVENTORY_SIZE):
 		var slot = slot_scene.instantiate()

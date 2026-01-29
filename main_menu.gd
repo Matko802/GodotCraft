@@ -32,6 +32,7 @@ extends Control
 @onready var msaa_button = find_child("MSAAOptionButtonUI", true) as OptionButton
 @onready var slim_checkbox = find_child("SlimModelCheckBoxUI", true) as CheckBox
 @onready var custom_texture_input = find_child("CustomTextureInputUI", true) as LineEdit
+@onready var browse_texture_button = find_child("BrowseTextureButtonUI", true) as Button
 @onready var username_input = find_child("UsernameInputUI", true) as LineEdit
 @onready var settings_back_button = find_child("SettingsBackButtonUI", true) as Button
 
@@ -39,6 +40,10 @@ var selected_save_index = -1
 
 func _ready():
 	randomize()
+	
+	print("Checking nodes...")
+	print("browse_texture_button: ", browse_texture_button)
+	print("username_input: ", username_input)
 	
 	_style_all_buttons()
 	
@@ -72,6 +77,7 @@ func _ready():
 	
 	slim_checkbox.toggled.connect(_on_slim_toggled)
 	custom_texture_input.text_changed.connect(_on_custom_texture_changed)
+	browse_texture_button.pressed.connect(_on_browse_texture_pressed)
 	username_input.text_changed.connect(_on_username_changed)
 	
 	# Initial UI state
@@ -98,36 +104,50 @@ func _ready():
 		username_input.text = state.username
 
 func _style_all_buttons():
-	# Find all buttons in the scene
-	var buttons = []
+	# Find all buttons and other controls in the scene
+	var controls = []
 	var stack = [self]
 	while stack.size() > 0:
 		var node = stack.pop_back()
-		if node is Button:
-			buttons.append(node)
+		if node is Control:
+			controls.append(node)
 		for child in node.get_children():
 			stack.push_back(child)
 	
-	for btn in buttons:
-		btn.add_theme_font_size_override("font_size", 24)
-		btn.custom_minimum_size.y = 50
-		
-		# Specific colors for critical buttons
-		if btn == load_button:
-			var style = btn.get_theme_stylebox("normal").duplicate() if btn.has_theme_stylebox("normal") else StyleBoxFlat.new()
-			if style is StyleBoxFlat:
-				style.bg_color = Color(0.2, 0.6, 0.2) # Green
-				btn.add_theme_stylebox_override("normal", style)
-		elif btn == delete_button:
-			var style = btn.get_theme_stylebox("normal").duplicate() if btn.has_theme_stylebox("normal") else StyleBoxFlat.new()
-			if style is StyleBoxFlat:
-				style.bg_color = Color(0.6, 0.2, 0.2) # Red
-				btn.add_theme_stylebox_override("normal", style)
-		elif btn == create_button:
-			var style = btn.get_theme_stylebox("normal").duplicate() if btn.has_theme_stylebox("normal") else StyleBoxFlat.new()
-			if style is StyleBoxFlat:
-				style.bg_color = Color(0.2, 0.4, 0.6) # Blue-ish
-				btn.add_theme_stylebox_override("normal", style)
+	for node in controls:
+		if node is Button:
+			node.add_theme_font_size_override("font_size", 24)
+			node.custom_minimum_size.y = 50
+			
+			# Specific colors for critical buttons
+			if node == load_button:
+				var style = node.get_theme_stylebox("normal").duplicate() if node.has_theme_stylebox("normal") else StyleBoxFlat.new()
+				if style is StyleBoxFlat:
+					style.bg_color = Color(0.2, 0.6, 0.2) # Green
+					node.add_theme_stylebox_override("normal", style)
+			elif node == delete_button:
+				var style = node.get_theme_stylebox("normal").duplicate() if node.has_theme_stylebox("normal") else StyleBoxFlat.new()
+				if style is StyleBoxFlat:
+					style.bg_color = Color(0.6, 0.2, 0.2) # Red
+					node.add_theme_stylebox_override("normal", style)
+			elif node == create_button:
+				var style = node.get_theme_stylebox("normal").duplicate() if node.has_theme_stylebox("normal") else StyleBoxFlat.new()
+				if style is StyleBoxFlat:
+					style.bg_color = Color(0.2, 0.4, 0.6) # Blue-ish
+					node.add_theme_stylebox_override("normal", style)
+		elif node is Label:
+			if node.name != "Title": # Keep title as is or it might be too small/big
+				node.add_theme_font_size_override("font_size", 20)
+		elif node is LineEdit:
+			node.add_theme_font_size_override("font_size", 20)
+			node.custom_minimum_size.y = 45
+		elif node is CheckBox:
+			node.add_theme_font_size_override("font_size", 20)
+		elif node is OptionButton:
+			node.add_theme_font_size_override("font_size", 20)
+			node.custom_minimum_size.y = 45
+		elif node is HSlider:
+			node.custom_minimum_size.y = 30
 
 
 func _on_external_settings_changed():
@@ -322,3 +342,34 @@ func _on_username_changed(new_username):
 	if state:
 		state.username = new_username
 		state.save_settings()
+
+func _on_browse_texture_pressed():
+	# Use Godot's built-in file dialog which works on Desktop and Godot 4.3+ Web
+	# Filters for common image formats
+	var filters = ["*.png", "*.jpg", "*.jpeg", "*.tga", "*.bmp", "*.webp"]
+	DisplayServer.file_dialog_show("Open Player Texture", "", "", false, DisplayServer.FILE_DIALOG_MODE_OPEN_FILE, filters, _on_file_selected)
+
+func _on_file_selected(status: bool, selected_paths: PackedStringArray, _selected_filter_index: int):
+	if not status or selected_paths.is_empty():
+		return
+		
+	var path = selected_paths[0]
+	var img = Image.load_from_file(path)
+	if img:
+		# Copy the file to user:// to ensure it persists and is accessible by the game
+		# This is especially important for Web where the local path might be temporary
+		var ext = path.get_extension()
+		var target_path = "user://custom_skin." + ext
+		
+		# For Web, we must save it to user:// to ensure we have a persistent internal path
+		var err = img.save_png(target_path) if ext.to_lower() == "png" else img.save_webp(target_path)
+		
+		if err == OK:
+			var state = get_node_or_null("/root/GameState")
+			if state:
+				state.custom_texture_path = target_path
+				state.save_settings()
+				custom_texture_input.text = target_path
+				print("Skin saved to: ", target_path)
+		else:
+			print("Error saving custom skin: ", err)

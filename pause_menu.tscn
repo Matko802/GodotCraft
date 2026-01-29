@@ -1,8 +1,8 @@
-[gd_scene load_steps=2 format=3 uid="uid://c8drrrhvlktib"]
+[gd_scene format=3 uid="uid://c8drrrhvlktib"]
 
 [ext_resource type="Script" uid="uid://chjwurv6x8u8h" path="res://pause_menu.gd" id="1_hdmo1"]
 
-[node name="PauseMenu" type="Control"]
+[node name="PauseMenu" type="Control" unique_id=1517302904]
 process_mode = 3
 layout_mode = 3
 anchors_preset = 15
@@ -12,7 +12,7 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_hdmo1")
 
-[node name="Background" type="ColorRect" parent="."]
+[node name="Background" type="ColorRect" parent="." unique_id=2059856957]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -21,7 +21,7 @@ grow_horizontal = 2
 grow_vertical = 2
 color = Color(0, 0, 0, 0.5)
 
-[node name="CenterContainer" type="CenterContainer" parent="."]
+[node name="CenterContainer" type="CenterContainer" parent="." unique_id=1284892134]
 layout_mode = 1
 anchors_preset = 8
 anchor_left = 0.5
@@ -35,133 +35,160 @@ offset_bottom = 64.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="MenuPanel" type="PanelContainer" parent="CenterContainer"]
-custom_minimum_size = Vector2(400, 0)
+[node name="MenuPanel" type="PanelContainer" parent="CenterContainer" unique_id=1444920542]
+custom_minimum_size = Vector2(550, 0)
 layout_mode = 2
 
-[node name="MenuMargin" type="MarginContainer" parent="CenterContainer/MenuPanel"]
+[node name="MenuMargin" type="MarginContainer" parent="CenterContainer/MenuPanel" unique_id=1624327843]
 layout_mode = 2
 
-[node name="VBoxContainer" type="VBoxContainer" parent="CenterContainer/MenuPanel/MenuMargin"]
+[node name="VBoxContainer" type="VBoxContainer" parent="CenterContainer/MenuPanel/MenuMargin" unique_id=327619331]
 layout_mode = 2
 
-[node name="Label" type="Label" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer"]
+[node name="Label" type="Label" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer" unique_id=396358043]
 layout_mode = 2
 text = "PAUSED"
 horizontal_alignment = 1
 
-[node name="MainContent" type="VBoxContainer" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer"]
+[node name="MainContent" type="VBoxContainer" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer" unique_id=675627805]
 layout_mode = 2
 
-[node name="ResumeButton" type="Button" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/MainContent"]
+[node name="ResumeButton" type="Button" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/MainContent" unique_id=1237422847]
 custom_minimum_size = Vector2(0, 40)
 layout_mode = 2
 text = "Resume"
 
-[node name="SettingsButton" type="Button" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/MainContent"]
+[node name="SettingsButton" type="Button" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/MainContent" unique_id=1588206053]
 custom_minimum_size = Vector2(0, 40)
 layout_mode = 2
 text = "Settings"
 
-[node name="QuitButton" type="Button" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/MainContent"]
+[node name="QuitButton" type="Button" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/MainContent" unique_id=362219784]
 custom_minimum_size = Vector2(0, 40)
 layout_mode = 2
 text = "Quit to Title"
 
-[node name="SettingsContent" type="VBoxContainer" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer"]
+[node name="SettingsContent" type="VBoxContainer" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer" unique_id=417274335]
 visible = false
 layout_mode = 2
 
-[node name="SettingsLabel" type="Label" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent"]
+[node name="SettingsLabel" type="Label" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent" unique_id=1250122940]
 layout_mode = 2
 text = "Settings"
 horizontal_alignment = 1
 
-[node name="BackButtonUI" type="Button" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent"]
-layout_mode = 2
-text = "Back"
-
-[node name="ScrollContainer" type="ScrollContainer" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent"]
-custom_minimum_size = Vector2(0, 300)
+[node name="ScrollContainer" type="ScrollContainer" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent" unique_id=526592647]
+custom_minimum_size = Vector2(0, 450)
 layout_mode = 2
 
-[node name="SettingsList" type="VBoxContainer" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/ScrollContainer"]
+[node name="SettingsList" type="VBoxContainer" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/ScrollContainer" unique_id=44823366]
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="GraphicsSectionLabel" type="Label" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/ScrollContainer/SettingsList"]
+[node name="GraphicsSectionLabel" type="Label" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/ScrollContainer/SettingsList" unique_id=940917084]
 layout_mode = 2
 text = "--- Graphics ---"
 horizontal_alignment = 1
 
-[node name="FullscreenCheckBoxUI" type="CheckBox" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/ScrollContainer/SettingsList"]
+[node name="FullscreenCheckBoxUI" type="CheckBox" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/ScrollContainer/SettingsList" unique_id=250677846]
 layout_mode = 2
 text = "Borderless Fullscreen"
 
-[node name="RenderDistanceHBox" type="HBoxContainer" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/ScrollContainer/SettingsList"]
+[node name="RenderDistanceHBox" type="HBoxContainer" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/ScrollContainer/SettingsList" unique_id=1741772397]
 layout_mode = 2
 
-[node name="RenderDistanceLabelUI" type="Label" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/ScrollContainer/SettingsList/RenderDistanceHBox"]
+[node name="RenderDistanceLabelUI" type="Label" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/ScrollContainer/SettingsList/RenderDistanceHBox" unique_id=2133581886]
 custom_minimum_size = Vector2(250, 0)
 layout_mode = 2
 text = "Render Distance: 4"
 
-[node name="RenderDistanceSliderUI" type="HSlider" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/ScrollContainer/SettingsList/RenderDistanceHBox"]
+[node name="RenderDistanceSliderUI" type="HSlider" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/ScrollContainer/SettingsList/RenderDistanceHBox" unique_id=1872345090]
 layout_mode = 2
 size_flags_horizontal = 3
 min_value = 2.0
 max_value = 16.0
 value = 4.0
 
-[node name="FOVHBox" type="HBoxContainer" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/ScrollContainer/SettingsList"]
+[node name="FOVHBox" type="HBoxContainer" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/ScrollContainer/SettingsList" unique_id=1441861539]
 layout_mode = 2
 
-[node name="FOVLabelUI" type="Label" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/ScrollContainer/SettingsList/FOVHBox"]
+[node name="FOVLabelUI" type="Label" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/ScrollContainer/SettingsList/FOVHBox" unique_id=656300705]
 custom_minimum_size = Vector2(250, 0)
 layout_mode = 2
 text = "FOV: 75"
 
-[node name="FOVSliderUI" type="HSlider" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/ScrollContainer/SettingsList/FOVHBox"]
+[node name="FOVSliderUI" type="HSlider" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/ScrollContainer/SettingsList/FOVHBox" unique_id=479006206]
 layout_mode = 2
 size_flags_horizontal = 3
 min_value = 30.0
 max_value = 110.0
 value = 75.0
 
-[node name="VSyncHBox" type="HBoxContainer" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/ScrollContainer/SettingsList"]
+[node name="VSyncHBox" type="HBoxContainer" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/ScrollContainer/SettingsList" unique_id=1465662096]
 layout_mode = 2
 
-[node name="VSyncLabelUI" type="Label" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/ScrollContainer/SettingsList/VSyncHBox"]
+[node name="VSyncLabelUI" type="Label" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/ScrollContainer/SettingsList/VSyncHBox" unique_id=429537348]
 layout_mode = 2
 text = "VSync:"
 
-[node name="VSyncCheckBoxUI" type="CheckBox" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/ScrollContainer/SettingsList/VSyncHBox"]
+[node name="VSyncCheckBoxUI" type="CheckBox" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/ScrollContainer/SettingsList/VSyncHBox" unique_id=326372395]
 layout_mode = 2
 
-[node name="ShadowsHBox" type="HBoxContainer" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/ScrollContainer/SettingsList"]
+[node name="ShadowsHBox" type="HBoxContainer" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/ScrollContainer/SettingsList" unique_id=411093296]
 layout_mode = 2
 
-[node name="ShadowsLabelUI" type="Label" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/ScrollContainer/SettingsList/ShadowsHBox"]
+[node name="ShadowsLabelUI" type="Label" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/ScrollContainer/SettingsList/ShadowsHBox" unique_id=1845930437]
 layout_mode = 2
 text = "Shadows:"
 
-[node name="ShadowsSliderUI" type="HSlider" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/ScrollContainer/SettingsList/ShadowsHBox"]
+[node name="ShadowsSliderUI" type="HSlider" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/ScrollContainer/SettingsList/ShadowsHBox" unique_id=658747345]
 layout_mode = 2
 size_flags_horizontal = 3
 max_value = 4.0
 
-[node name="MSAAHBox" type="HBoxContainer" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/ScrollContainer/SettingsList"]
+[node name="MSAAHBox" type="HBoxContainer" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/ScrollContainer/SettingsList" unique_id=1147498351]
 layout_mode = 2
 
-[node name="MSAALabelUI" type="Label" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/ScrollContainer/SettingsList/MSAAHBox"]
+[node name="MSAALabelUI" type="Label" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/ScrollContainer/SettingsList/MSAAHBox" unique_id=596223818]
 layout_mode = 2
 text = "Anti-Aliasing:"
 
-[node name="MSAAOptionButtonUI" type="OptionButton" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/ScrollContainer/SettingsList/MSAAHBox"]
+[node name="MSAAOptionButtonUI" type="OptionButton" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/ScrollContainer/SettingsList/MSAAHBox" unique_id=1817081841]
 layout_mode = 2
 
-[node name="HSeparator2" type="HSeparator" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer"]
+[node name="UsernameHBox" type="HBoxContainer" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/ScrollContainer/SettingsList" unique_id=203585730]
 layout_mode = 2
 
-[node name="HeartsContainer" type="HBoxContainer" parent="."]
-layout_mode = 0
+[node name="UsernameLabelUI" type="Label" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/ScrollContainer/SettingsList/UsernameHBox" unique_id=1323761519]
+layout_mode = 2
+text = "Username: 	"
+
+[node name="UsernameInputUI" type="LineEdit" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/ScrollContainer/SettingsList/UsernameHBox" unique_id=1198582140]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="SlimModelCheckBoxUI" type="CheckBox" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/ScrollContainer/SettingsList" unique_id=1829057576]
+layout_mode = 2
+text = "Slim Player Model"
+
+[node name="CustomTextureHBox" type="HBoxContainer" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/ScrollContainer/SettingsList" unique_id=1056022311]
+layout_mode = 2
+
+[node name="CustomTextureLabelUI" type="Label" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/ScrollContainer/SettingsList/CustomTextureHBox" unique_id=1366724932]
+layout_mode = 2
+text = "Custom Texture Path: 	"
+
+[node name="CustomTextureInputUI" type="LineEdit" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/ScrollContainer/SettingsList/CustomTextureHBox" unique_id=1352664753]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="BrowseTextureButtonUI" type="Button" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent/ScrollContainer/SettingsList/CustomTextureHBox" unique_id=62986115]
+layout_mode = 2
+text = "Browse"
+
+[node name="BackButtonUI" type="Button" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer/SettingsContent" unique_id=1363398579]
+layout_mode = 2
+text = "Back"
+
+[node name="HSeparator2" type="HSeparator" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer" unique_id=246394836]
+layout_mode = 2
