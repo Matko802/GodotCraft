@@ -1,7 +1,9 @@
-[gd_scene load_steps=8 format=3 uid="uid://bp4f8daix5gf0"]
+[gd_scene format=3 uid="uid://bp4f8daix5gf0"]
 
 [ext_resource type="Script" uid="uid://bh0wgf8q1g02w" path="res://world.gd" id="1_f3sb7"]
 [ext_resource type="PackedScene" uid="uid://ojwlgihwqr3w" path="res://player.tscn" id="2_tlwt5"]
+[ext_resource type="PackedScene" uid="uid://dtx8oc3xkjk7c" path="res://sky.tscn" id="3_aqk2v"]
+[ext_resource type="Script" uid="uid://ehwr12kbjbtj" path="res://sky.gd" id="4_036b0"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_fj7yv"]
 
@@ -13,30 +15,24 @@ background_mode = 2
 sky = SubResource("Sky_fj7yv")
 tonemap_mode = 2
 
-[sub_resource type="QuadMesh" id="QuadMesh_fj7yv"]
-size = Vector2(20, 20)
-
-[sub_resource type="QuadMesh" id="QuadMesh_tlwt5"]
-size = Vector2(20, 20)
-
-[node name="World" type="Node3D"]
+[node name="World" type="Node3D" unique_id=2144075974]
 script = ExtResource("1_f3sb7")
 
-[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1250105441]
 environment = SubResource("Environment_fj7yv")
 
-[node name="Player" parent="." instance=ExtResource("2_tlwt5")]
+[node name="Player" parent="." unique_id=1285613287 instance=ExtResource("2_tlwt5")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 40, 8)
 
-[node name="LoadingLayer" type="CanvasLayer" parent="."]
+[node name="LoadingLayer" type="CanvasLayer" parent="." unique_id=525827564]
 
-[node name="Background" type="ColorRect" parent="LoadingLayer"]
+[node name="Background" type="ColorRect" parent="LoadingLayer" unique_id=831535614]
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 color = Color(0.1, 0.1, 0.1, 1)
 
-[node name="ProgressBar" type="ProgressBar" parent="LoadingLayer"]
+[node name="ProgressBar" type="ProgressBar" parent="LoadingLayer" unique_id=1151647956]
 custom_minimum_size = Vector2(400, 30)
 anchors_preset = 8
 anchor_left = 0.5
@@ -48,7 +44,7 @@ offset_top = -13.5
 offset_right = 2.0
 offset_bottom = 13.5
 
-[node name="StatusLabel" type="Label" parent="LoadingLayer"]
+[node name="StatusLabel" type="Label" parent="LoadingLayer" unique_id=1537331614]
 anchors_preset = 8
 anchor_left = 0.5
 anchor_top = 0.5
@@ -61,7 +57,7 @@ offset_bottom = 11.5
 text = "Generating World..."
 horizontal_alignment = 1
 
-[node name="DefaultLight" type="DirectionalLight3D" parent="."]
+[node name="DefaultLight" type="DirectionalLight3D" parent="." unique_id=699415986]
 transform = Transform3D(0.70710677, -0.49999997, 0.49999997, 0, 0.70710677, 0.70710677, -0.70710677, -0.49999997, 0.49999997, 0, 0, 0)
 light_color = Color(0.67481464, 0.67481464, 0.6748146, 1)
 light_energy = 0.8
@@ -69,14 +65,5 @@ shadow_enabled = true
 shadow_bias = 0.02
 directional_shadow_mode = 0
 
-[node name="CelestialBodies" type="Node3D" parent="."]
-
-[node name="Sun" type="MeshInstance3D" parent="CelestialBodies"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -100)
-gi_mode = 2
-mesh = SubResource("QuadMesh_fj7yv")
-
-[node name="Moon" type="MeshInstance3D" parent="CelestialBodies"]
-transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0, 100)
-gi_mode = 2
-mesh = SubResource("QuadMesh_tlwt5")
+[node name="Sky" type="Node3D" parent="." unique_id=1926977790 instance=ExtResource("3_aqk2v")]
+script = ExtResource("4_036b0")

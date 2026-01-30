@@ -1,0 +1,10 @@
+[gd_scene format=3 uid="uid://dtx8oc3xkjk7c"]
+
+[ext_resource type="Script" uid="uid://ehwr12kbjbtj" path="res://sky.gd" id="1_gr5xt"]
+
+[node name="Sky" type="Node3D" unique_id=1926977790]
+script = ExtResource("1_gr5xt")
+
+[node name="Sun" type="MeshInstance3D" parent="." unique_id=1315204987]
+
+[node name="Moon" type="MeshInstance3D" parent="." unique_id=1884654613]

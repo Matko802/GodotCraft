@@ -41,8 +41,8 @@ func _process(delta):
 			text += "Chunk: %d %d\n" % [cx, cz]
 			
 			# Time display
-			var hours = int(world.time / 1000.0)
-			var minutes = int((world.time / 1000.0 - hours) * 60.0)
+			var hours = (int(world.time / 1000.0) + 6) % 24
+			var minutes = int((world.time / 1000.0 - int(world.time / 1000.0)) * 60.0)
 			text += "Time: %02d:%02d (Day %d)\n" % [hours, minutes, world.days_passed + 1]
 	
 	if state:

@@ -113,7 +113,7 @@ const MAX_TIME = 24000.0
 
 @onready var sun = $DefaultLight
 @onready var world_env = $WorldEnvironment
-@onready var celestial_bodies = $CelestialBodies
+@onready var celestial_bodies = $Sky
 
 var is_loading = true
 var total_spawn_chunks = 0
@@ -557,8 +557,10 @@ func _update_sun_rotation():
 	
 	# Position following player
 	var player = get_tree().get_first_node_in_group("player")
-	if player:
-		celestial_bodies.global_position = player.global_position
+	var p_pos = player.global_position if player else Vector3.ZERO
+	
+	if celestial_bodies.has_method("update_time"):
+		celestial_bodies.update_time(time, p_pos)
 
 	# Minecraft Time mapping:
 	# 0 = Sunrise/Early Morning (Sun at Horizon)
@@ -567,7 +569,6 @@ func _update_sun_rotation():
 	# 18000 = Midnight (Moon at Zenith)
 	
 	var angle = (time / MAX_TIME) * 360.0
-	celestial_bodies.rotation_degrees.x = angle
 	
 	# Light rotation matches sun/moon
 	# During day (0-12000), sun is up. During night (12000-24000), moon is up.
@@ -591,10 +592,10 @@ func _update_sun_rotation():
 	var night_color = Color(0.15, 0.15, 0.3)
 	
 	if is_day:
-		sun.light_energy = day_pos * 0.6 + 0.1
+		sun.light_energy = day_pos * 0.4 + 0.1
 		sun.light_color = sunset_color.lerp(day_color, day_pos)
 	else:
-		sun.light_energy = night_pos * 0.4 + 0.2
+		sun.light_energy = night_pos * 0.2 + 0.3
 		sun.light_color = night_color
 	
 	if world_env:
@@ -621,11 +622,13 @@ func _update_sun_rotation():
 			env.sky.sky_material.ground_horizon_color = current_hor
 		
 		# Ambient Lighting - Tuned for night visibility and softer days
-		env.ambient_light_energy = transition * 0.2 + 0.35
-		env.ambient_light_color = Color(0.6, 0.6, 0.7).lerp(Color(1, 1, 1), transition)
+		env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+		env.ambient_light_energy = transition * 0.15 + 0.05 # High base energy for night
+		env.ambient_light_color = Color(0.7, 0.7, 0.85).lerp(Color(1, 1, 1), transition)
 		
-		# Adjust fog if needed
-		env.background_energy_multiplier = transition * 0.5 + 0.4
+		# Fog and background energy
+		env.background_energy_multiplier = transition * 0.4 + 0.6
+		env.tonemap_exposure = 1.0 # Ensure exposure isn't too low
 
 func _notification(what):
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:
@@ -758,29 +761,6 @@ func _setup_materials():
 		wood_mat.set_shader_parameter("side_texture", load("res://textures/oak_wood_side.png"))
 	materials[BlockType.WOOD] = wood_mat
 
-	# Sun & Moon setup
-	var sun_node = get_node_or_null("CelestialBodies/Sun")
-	if sun_node:
-		var mat = StandardMaterial3D.new()
-		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		mat.albedo_texture = load("res://textures/sky/sun.png")
-		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
-		mat.render_priority = -10
-		mat.no_depth_test = false
-		sun_node.material_override = mat
-		
-	var moon_node = get_node_or_null("CelestialBodies/Moon")
-	if moon_node:
-		var mat = StandardMaterial3D.new()
-		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		mat.albedo_texture = load("res://textures/sky/moon.png")
-		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
-		mat.render_priority = -10
-		mat.no_depth_test = false
-		moon_node.material_override = mat
-		
 	# Torch Mesh Setup
 	var torch_scene = load("res://models/block/torch/torch.gltf").instantiate()
 	var torch_mesh_instances = torch_scene.find_children("*", "MeshInstance3D", true)
