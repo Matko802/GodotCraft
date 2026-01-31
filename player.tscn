@@ -11,6 +11,7 @@
 [ext_resource type="PackedScene" uid="uid://b7vfq3ku62p3m" path="res://chat_ui.tscn" id="5_dw050"]
 [ext_resource type="PackedScene" uid="uid://ta8bnvapkayn" path="res://debug_menu.tscn" id="7_n7ghd"]
 [ext_resource type="PackedScene" uid="uid://dxvt2ug1ktjt0" path="res://models/player/wide/model.gltf" id="9_b26j0"]
+[ext_resource type="PackedScene" uid="uid://mkxyessh3dcq" path="res://models/player/Matko880 exclusive model/MatkoHandModel.gltf" id="12_ivps1"]
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_nvl01"]
 height = 1.8105469
@@ -62,7 +63,7 @@ layer = 10
 
 [node name="PauseMenu" parent="PauseLayer" unique_id=1566094500 instance=ExtResource("5_1jxqw")]
 
-[node name="PlayerModel" parent="." unique_id=1861412354 instance=ExtResource("9_b26j0")]
+[node name="PlayerModel" parent="." unique_id=1625290371 instance=ExtResource("9_b26j0")]
 transform = Transform3D(0.9, 0, 0, 0, 0.9, 0, 0, 0, 0.9, 0, -0.9912943, 0)
 
 [node name="ViewModelAnimationPlayer" type="AnimationPlayer" parent="." unique_id=1165413982]
@@ -70,7 +71,7 @@ transform = Transform3D(0.9, 0, 0, 0, 0.9, 0, 0, 0, 0.9, 0, -0.9912943, 0)
 [node name="TPHeldItemRoot" type="Node3D" parent="." unique_id=617698788]
 
 [node name="TPHeldItemMesh" type="MeshInstance3D" parent="TPHeldItemRoot" unique_id=2905852]
-transform = Transform3D(0.39999998, 0, 0, 0, 0.2828427, 0.2828427, 0, -0.2828427, 0.2828427, 0.321, -0.271, 0.023901299)
+transform = Transform3D(0.39999998, 0, 0, 0, 0.39999998, 0, 0, 0, 0.39999998, 0.321, -0.271, 0.023901299)
 
 [node name="SpringArm3D" type="SpringArm3D" parent="." unique_id=841691994]
 spring_length = 4.0
@@ -107,6 +108,9 @@ transform = Transform3D(0.845588, 0, -0.5338359, 0, 1, 0, 0.5338359, 0, 0.845588
 transform = Transform3D(0.4615478, 0.11281443, 0.8799118, 0.82067645, -0.43092188, -0.37522703, 0.33684272, 0.89530855, -0.29147518, -0.17556804, 0.033577055, -1.1137364)
 
 [node name="SlimHandModel" parent="ViewModelLayer/ViewModelContainer/SubViewport/ViewModelCamera/ViewModelArm" unique_id=695351138 instance=ExtResource("2_n7ghd")]
+transform = Transform3D(0.46154803, 0.112814456, 0.8799126, 0.8206767, -0.43092227, -0.37522724, 0.3368428, 0.89530945, -0.2914756, -0.17556804, 0.033577055, -1.1137364)
+
+[node name="MatkoHandModel" parent="ViewModelLayer/ViewModelContainer/SubViewport/ViewModelCamera/ViewModelArm" unique_id=760089818 instance=ExtResource("12_ivps1")]
 transform = Transform3D(0.46154803, 0.112814456, 0.8799126, 0.8206767, -0.43092227, -0.37522724, 0.3368428, 0.89530945, -0.2914756, -0.17556804, 0.033577055, -1.1137364)
 
 [node name="HeldItemRoot" type="Node3D" parent="ViewModelLayer/ViewModelContainer/SubViewport/ViewModelCamera/ViewModelArm" unique_id=979476552]

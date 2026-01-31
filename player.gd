@@ -22,6 +22,7 @@ const MOUSE_SENSITIVITY = 0.002
 @onready var view_model_arm = $ViewModelLayer/ViewModelContainer/SubViewport/ViewModelCamera/ViewModelArm
 @onready var slim_hand = $ViewModelLayer/ViewModelContainer/SubViewport/ViewModelCamera/ViewModelArm/SlimHandModel
 @onready var wide_hand = $ViewModelLayer/ViewModelContainer/SubViewport/ViewModelCamera/ViewModelArm/WideHandModel
+@onready var matko_hand = $ViewModelLayer/ViewModelContainer/SubViewport/ViewModelCamera/ViewModelArm/MatkoHandModel
 @onready var held_item_mesh = $ViewModelLayer/ViewModelContainer/SubViewport/ViewModelCamera/ViewModelArm/HeldItemRoot/HeldItemMesh
 @onready var held_torch_root = $ViewModelLayer/ViewModelContainer/SubViewport/ViewModelCamera/ViewModelArm/HeldTorchRoot
 @onready var hand_torch_mesh = $ViewModelLayer/ViewModelContainer/SubViewport/ViewModelCamera/ViewModelArm/HeldTorchRoot/HandTorchMesh
@@ -32,11 +33,15 @@ const MOUSE_SENSITIVITY = 0.002
 @onready var tp_held_torch_root = $TPHeldTorchRoot
 @onready var tp_held_torch_mesh = $TPHeldTorchRoot/TPHeldTorchMesh
 
-@onready var right_arm = $PlayerModel/Waist/"Right Arm2"
-@onready var left_arm = $PlayerModel/Waist/"Left Arm2"
-@onready var right_leg = $"PlayerModel/Right Leg2"
-@onready var left_leg = $"PlayerModel/Left Leg2"
+var right_arm_nodes = []
+var left_arm_nodes = []
+var right_leg_nodes = []
+var left_leg_nodes = []
+var head_nodes = []
+var tail_nodes = []
+var ear_nodes = []
 var _waist_node: Node3D = null
+var _model_anim: AnimationPlayer = null
 
 var walk_time = 0.0
 var idle_time = 0.0
@@ -111,7 +116,7 @@ enum CameraMode { FIRST_PERSON, THIRD_PERSON_BACK, THIRD_PERSON_FRONT }
 var current_camera_mode = CameraMode.FIRST_PERSON
 
 var view_model_base_pos = Vector3.ZERO
-var view_model_base_rot = Vector3.ZERO
+var view_model_base_rot = Vector3(0.1, -0.2, 0) # Slight inward tilt for natural look
 
 func _die():
 	var state = get_node_or_null("/root/GameState")
@@ -155,7 +160,9 @@ const MINING_TIMES = {
 	5: 1.5, # WOOD
 	6: 0.1, # LEAVES
 	9: 0.0, # TORCH
-	10: 0.5 # COARSE_DIRT
+	10: 0.5, # COARSE_DIRT
+	11: 1.5, # WOOD_X
+	12: 1.5 # WOOD_Z
 }
 
 var _was_on_floor = false
@@ -166,6 +173,7 @@ var _last_jump_press_time = -1.0
 const DOUBLE_TAP_TIME = 0.3
 
 func _ready():
+	process_priority = 10 # Run after AnimationPlayer to ensure our overrides win
 	add_to_group("player")
 	collision_layer = 2 # Player on layer 2
 	collision_mask = 1  # Collide with world (layer 1)
@@ -231,9 +239,12 @@ var camera_pitch = 0.0
 func _setup_player_model():
 	var state = get_node_or_null("/root/GameState")
 	var is_slim = state.is_slim if state else false
+	var is_matko = state.username == "Matko802" if state else false
 	
 	# Replace model if type changed
 	var model_path = "res://models/player/slim/model.gltf" if is_slim else "res://models/player/wide/model.gltf"
+	if is_matko:
+		model_path = "res://models/player/Matko880 exclusive model/Matko802.gltf"
 	
 	var current_path = player_model.scene_file_path
 	if current_path != model_path:
@@ -258,42 +269,67 @@ func _setup_player_model():
 		player_model.queue_free()
 		player_model = new_model
 
-	# Find body parts for animation with fallback
-	right_arm = player_model.find_child("Right Arm2", true)
-	if not right_arm: right_arm = player_model.find_child("Right Arm", true)
-	
-	left_arm = player_model.find_child("Left Arm2", true)
-	if not left_arm: left_arm = player_model.find_child("Left Arm", true)
-	
-	right_leg = player_model.find_child("Right Leg2", true)
-	if not right_leg: right_leg = player_model.find_child("Right Leg", true)
-	
-	left_leg = player_model.find_child("Left Leg2", true)
-	if not left_leg: left_leg = player_model.find_child("Left Leg", true)
-	
-	var new_head = player_model.find_child("Head2", true)
-	if not new_head: new_head = player_model.find_child("Head", true)
+	# Find body parts for animation
+	right_arm_nodes = _filter_top_level_nodes(_find_all_matching_nodes(player_model, ["Right Arm2", "Right Arm", "right_arm", "Right_Arm", "RightArm", "rightArm", "arm_right", "ArmRight", "Right Arm Layer", "right_arm_layer"]))
+	left_arm_nodes = _filter_top_level_nodes(_find_all_matching_nodes(player_model, ["Left Arm2", "Left Arm", "left_arm", "Left_Arm", "LeftArm", "leftArm", "arm_left", "ArmLeft", "Left Arm Layer", "left_arm_layer"]))
+	right_leg_nodes = _filter_top_level_nodes(_find_all_matching_nodes(player_model, ["Right Leg2", "Right Leg", "right_leg", "Right_Leg", "RightLeg", "rightLeg", "leg_right", "LegRight", "Right Leg Layer", "right_leg_layer"]))
+	left_leg_nodes = _filter_top_level_nodes(_find_all_matching_nodes(player_model, ["Left Leg2", "Left Leg", "left_leg", "Left_Leg", "LeftLeg", "leftLeg", "leg_left", "LegLeft", "Left Leg Layer", "left_leg_layer"]))
+	head_nodes = _filter_top_level_nodes(_find_all_matching_nodes(player_model, ["Head2", "Head", "head", "Head Layer", "head_layer", "Head_Layer", "HeadLayer", "hat", "Hat"]))
+	tail_nodes = _filter_top_level_nodes(_find_all_matching_nodes(player_model, ["Tail", "tail"]))
+	ear_nodes = _filter_top_level_nodes(_find_all_matching_nodes(player_model, ["Ears", "ears", "Ear", "ear"]))
 	
 	_waist_node = player_model.find_child("Waist", true)
+	if not _waist_node: _waist_node = player_model.find_child("body", true)
+	if not _waist_node: _waist_node = player_model.find_child("Body", true)
+	if not _waist_node: _waist_node = player_model.find_child("torso", true)
+	if not _waist_node: _waist_node = player_model.find_child("Torso", true)
+	if not _waist_node: _waist_node = player_model.find_child("*body*", true, false)
 	
-	if new_head and head_node != new_head:
-		head_node = new_head
+	if not head_nodes.is_empty():
+		head_node = head_nodes[0]
+
+	# Find AnimationPlayer
+	_model_anim = player_model.find_child("AnimationPlayer", true)
+	if not _model_anim:
+		var anim_players = player_model.find_children("*", "AnimationPlayer", true)
+		if not anim_players.is_empty():
+			_model_anim = anim_players[0]
+	
+	if _model_anim:
+		print("Found AnimationPlayer on model: ", _model_anim.name)
+		var anims = _model_anim.get_animation_list()
+		print("Available animations: ", anims)
+		
+		# Robust animation playing
+		var start_anim = _find_best_anim("idle")
+		if start_anim != "":
+			_model_anim.play(start_anim)
+		else:
+			if not anims.is_empty():
+				_model_anim.play(anims[0])
+	else:
+		print("CRITICAL: AnimationPlayer not found on model!")
+		player_model.print_tree_pretty()
 
 	# Setup Third Person held item attachment from scene
-	if right_arm:
+	if not right_arm_nodes.is_empty():
+		var main_right_arm = right_arm_nodes[0]
 		if tp_held_item_root:
-			if tp_held_item_root.get_parent() != right_arm:
-				tp_held_item_root.reparent(right_arm, true)
+			if tp_held_item_root.get_parent() != main_right_arm:
+				tp_held_item_root.reparent(main_right_arm, true)
 		
 		if tp_held_torch_root:
-			if tp_held_torch_root.get_parent() != right_arm:
-				tp_held_torch_root.reparent(right_arm, true)
+			if tp_held_torch_root.get_parent() != main_right_arm:
+				tp_held_torch_root.reparent(main_right_arm, true)
 
 	# Apply texture
 	var texture = null
-	var custom_path = state.custom_texture_path if state else ""
+	var state_gm = get_node_or_null("/root/GameState")
+	var custom_path = state_gm.custom_texture_path if state_gm else ""
 	
-	if custom_path != "" and (custom_path.begins_with("user://") or FileAccess.file_exists(custom_path)):
+	if is_matko:
+		texture = load("res://models/player/Matko880 exclusive model/MatkoHandModel_0.png")
+	elif custom_path != "" and (custom_path.begins_with("user://") or FileAccess.file_exists(custom_path)):
 		var img = Image.load_from_file(custom_path)
 		if img:
 			texture = ImageTexture.create_from_image(img)
@@ -319,11 +355,38 @@ func _setup_player_model():
 	
 	_update_camera_mode()
 
+func _find_all_matching_nodes(root: Node, names: Array) -> Array:
+	var matches = []
+	var stack = [root]
+	while not stack.is_empty():
+		var node = stack.pop_back()
+		for name_to_check in names:
+			if node.name.to_lower() == name_to_check.to_lower():
+				matches.append(node)
+				break
+		for child in node.get_children():
+			stack.push_back(child)
+	return matches
+
+func _filter_top_level_nodes(nodes: Array) -> Array:
+	var filtered = []
+	for node in nodes:
+		var is_child = false
+		for other in nodes:
+			if node != other and other.is_ancestor_of(node):
+				is_child = true
+				break
+		if not is_child:
+			filtered.append(node)
+	return filtered
+
+
 func _on_settings_changed():
 	var state = get_node_or_null("/root/GameState")
 	if state:
 		camera.fov = state.fov
 		_update_light_shadows()
+		_setup_player_model()
 
 func _update_light_shadows():
 	if not _hand_light_ref: return
@@ -411,13 +474,16 @@ func _setup_view_model():
 	
 	var state = get_node_or_null("/root/GameState")
 	var is_slim = state.is_slim if state else false
+	var is_matko = state.username == "Matko802" if state else false
 	
 	# Initial visibility handled by _update_held_item_mesh
 	# Setup Materials for hands
 	var texture = null
 	var custom_path = state.custom_texture_path if state else ""
 	
-	if custom_path != "" and (custom_path.begins_with("user://") or FileAccess.file_exists(custom_path)):
+	if is_matko:
+		texture = load("res://models/player/Matko880 exclusive model/MatkoHandModel_0.png")
+	elif custom_path != "" and (custom_path.begins_with("user://") or FileAccess.file_exists(custom_path)):
 		var img = Image.load_from_file(custom_path)
 		if img:
 			texture = ImageTexture.create_from_image(img)
@@ -430,7 +496,7 @@ func _setup_view_model():
 	hand_mat.shader = load("res://viewmodel.gdshader")
 	hand_mat.set_shader_parameter("albedo_texture", texture)
 	
-	for hand in [slim_hand, wide_hand]:
+	for hand in [slim_hand, wide_hand, matko_hand]:
 		for child in hand.find_children("*", "MeshInstance3D", true):
 			child.material_override = hand_mat
 			child.layers = 2
@@ -441,6 +507,7 @@ func _setup_view_model():
 func _update_held_item_mesh():
 	var state = get_node_or_null("/root/GameState")
 	var is_slim = state.is_slim if state else false
+	var is_matko = state.username == "Matko802" if state else false
 	var item = inventory.hotbar[selected_slot]
 	var is_fp = current_camera_mode == CameraMode.FIRST_PERSON
 	
@@ -472,8 +539,9 @@ func _update_held_item_mesh():
 	
 	# Always manage hand visibility in FP - Hide hand if holding an item
 	var show_hand = is_fp and not item
-	slim_hand.visible = is_slim and show_hand
-	wide_hand.visible = not is_slim and show_hand
+	slim_hand.visible = is_slim and show_hand and not is_matko
+	wide_hand.visible = not is_slim and show_hand and not is_matko
+	matko_hand.visible = is_matko and show_hand
 	
 	if not item:
 		held_item_mesh.visible = false
@@ -616,6 +684,7 @@ func _process(delta):
 	_update_mining(delta)
 	_update_sneak(delta)
 	_animate_walk(delta)
+	_update_arm_overrides(delta)
 	_update_view_model(delta)
 	_apply_rotations()
 
@@ -630,18 +699,10 @@ func _update_sneak(delta):
 	sneak_progress = move_toward(sneak_progress, target_sneak, delta * SNEAK_TRANSITION_SPEED)
 	
 	# Adjust spring arm height smoothly instead of camera
-	# This ensures the vertical offset is always relative to the player's up axis,
-	# not the camera's local rotated axis.
 	var base_spring_y = 0.65
 	spring_arm.position.y = base_spring_y + (sneak_progress * SNEAK_CAM_OFFSET)
 	
-	# Adjust third person model scale/position for sneaking
-	if player_model:
-		# Shift model down
-		player_model.position.y = -0.99 + (sneak_progress * -0.05)
-		if _waist_node:
-			# Tilt the body backward (negative value)
-			_waist_node.rotation.x = sneak_progress * -0.4
+	# Procedural model sneaking adjustments removed to favor model animations
 
 	# Fallback safety: If we are stuck in a block, reset fall damage to prevent unfair death
 	if get_last_slide_collision() != null and not is_on_floor() and velocity.length() < 1.0:
@@ -727,8 +788,12 @@ func _finish_mining(block_pos, type):
 	
 	swing()
 	
+	var drop_type = type
+	if drop_type == 11 or drop_type == 12:
+		drop_type = 5 # Both drop standard WOOD item
+
 	if not is_creative_mode:
-		inventory.spawn_dropped_item(type, 1, Vector3(block_pos) + Vector3(0.5, 0.5, 0.5), world)
+		inventory.spawn_dropped_item(drop_type, 1, Vector3(block_pos) + Vector3(0.5, 0.5, 0.5), world)
 	
 	world.remove_block(block_pos)
 	_reset_mining()
@@ -757,85 +822,172 @@ func _update_view_model(_delta = 0.0):
 	if current_camera_mode == CameraMode.FIRST_PERSON:
 		view_model_arm.visible = true
 		view_model_arm.scale = Vector3.ONE
-		# Position slightly lower and further away
-		view_model_base_pos = Vector3(0.4, -0.5, -0.8)
+		# Adjusted base position to be more Minecraft-authentic (further right and lower)
+		view_model_base_pos = Vector3(0.55, -0.55, -0.7)
 	else:
 		view_model_arm.visible = false
+
+func _find_best_anim(target: String) -> String:
+	if not _model_anim: return ""
+	
+	var anims = _model_anim.get_animation_list()
+	if anims.is_empty(): return ""
+	
+	var target_lower = target.to_lower()
+	
+	# 1. Exact case-insensitive match
+	for a in anims:
+		if a.to_lower() == target_lower: return a
+		
+	# 2. Priority match: Starts with target, but respects movement/idle distinction
+	var is_move = target_lower.contains("walk") or target_lower.contains("run") or target_lower.contains("sprint") or target_lower.contains("sneak")
+	
+	for a in anims:
+		var a_lower = a.to_lower()
+		if a_lower.begins_with(target_lower):
+			var a_is_move = a_lower.contains("walk") or a_lower.contains("run") or a_lower.contains("sprint") or a_lower.contains("sneak")
+			if is_move == a_is_move:
+				return a
+				
+	# 3. Fuzzy match: Begins with target (ignore movement distinction)
+	for a in anims:
+		if a.to_lower().begins_with(target_lower):
+			return a
+			
+	# 4. Fallbacks
+	if target_lower == "idle":
+		if _model_anim.has_animation("Animation"): return "Animation"
+		if _model_anim.has_animation("Action"): return "Action"
+	
+	return ""
 
 func _animate_walk(delta):
 	var horizontal_speed = Vector2(velocity.x, velocity.z).length()
 	idle_time += delta
 	
 	var item = inventory.hotbar[selected_slot]
-	var is_holding = item != null
+	var _is_holding = item != null
+	var is_sneaking = Input.is_action_pressed("sneak") and not is_flying
+	var is_sprinting = Input.is_key_pressed(KEY_CTRL) and not is_sneaking
 
-	if horizontal_speed > 0.1:
-		walk_time += delta * horizontal_speed * 2.5
+	# Procedural walk time scaling based on speed
+	if horizontal_speed > 0.05:
+		# Faster movement = faster animation phase
+		# We use a base multiplier that feels right for the stride length
+		walk_time += delta * horizontal_speed * 3.5
 	else:
 		walk_time = move_toward(walk_time, 0.0, delta * 10.0)
 	
 	# View model bobbing & swing
 	if view_model_arm:
-		var swing_rot = 0.0
+		var swing_rot = Vector3.ZERO
 		var swing_pos = Vector3.ZERO
 		if is_swinging:
-			# Simple punch-like curve
-			var s = sin(swing_progress * PI)
-			swing_rot = -s * 0.5
-			swing_pos = Vector3(0, s * 0.1, -s * 0.2)
+			# Minecraft-style swing curve: quick punch forward and down, then return
+			var s = swing_progress
+			var curve = sin(s * PI)
+			# Rotation: Swing down (X), inward (Y), and tilt (Z)
+			swing_rot.x = -curve * 1.1
+			swing_rot.y = curve * 0.6
+			swing_rot.z = -curve * 0.3
+			
+			# Position: Thrust forward (Z) and slightly left (X)
+			swing_pos.z = -curve * 0.3
+			swing_pos.x = -curve * 0.1
+			swing_pos.y = curve * 0.1
 		
+		# Intensity of bobbing scales with speed
 		var bob_intensity = clamp(horizontal_speed / SPRINT_SPEED, 0.0, 1.0)
 		if not is_on_floor(): bob_intensity = 0.0
 		
 		var bob_x = sin(walk_time * 0.5) * 0.02 * bob_intensity
 		var bob_y = abs(cos(walk_time)) * 0.02 * bob_intensity
 		
-		view_model_arm.position.x = lerp(view_model_arm.position.x, view_model_base_pos.x + swing_pos.x + bob_x, delta * 10.0)
-		view_model_arm.position.y = lerp(view_model_arm.position.y, view_model_base_pos.y + swing_pos.y - bob_y, delta * 10.0)
-		view_model_arm.position.z = lerp(view_model_arm.position.z, view_model_base_pos.z + swing_pos.z, delta * 10.0)
-		view_model_arm.rotation.x = lerp(view_model_arm.rotation.x, view_model_base_rot.x + swing_rot, delta * 15.0)
+		view_model_arm.position.x = lerp(view_model_arm.position.x, view_model_base_pos.x + swing_pos.x + bob_x, delta * 15.0)
+		view_model_arm.position.y = lerp(view_model_arm.position.y, view_model_base_pos.y + swing_pos.y - bob_y, delta * 15.0)
+		view_model_arm.position.z = lerp(view_model_arm.position.z, view_model_base_pos.z + swing_pos.z, delta * 15.0)
+		
+		# Apply combined rotation
+		view_model_arm.rotation.x = lerp(view_model_arm.rotation.x, view_model_base_rot.x + swing_rot.x, delta * 20.0)
+		view_model_arm.rotation.y = lerp(view_model_arm.rotation.y, view_model_base_rot.y + swing_rot.y, delta * 20.0)
+		view_model_arm.rotation.z = lerp(view_model_arm.rotation.z, view_model_base_rot.z + swing_rot.z, delta * 20.0)
 
-	if horizontal_speed > 0.1:
-		var angle = sin(walk_time) * (0.6 + sneak_progress * -0.2)
-		var arm_bend = sneak_progress * 0.2
+	# Model Animation handling
+	if _model_anim:
+		var target_name = "idle"
+		var anim_speed = 1.0
 		
-		right_leg.rotation = Vector3(-angle, 0, 0)
-		left_leg.rotation = Vector3(angle, 0, 0)
+		var in_air = not is_on_floor() and not is_flying
+		var is_moving = horizontal_speed > 0.1
 		
-		# 3rd person arm swing
-		if is_swinging:
-			var s = sin(swing_progress * PI)
-			right_arm.rotation = Vector3(-s * -0.8 + arm_bend, 0, 0)
-		else:
-			if is_holding:
-				right_arm.rotation = Vector3(0.3 + (angle * 0.3) + arm_bend, 0, 0)
+		if is_sneaking:
+			if is_moving:
+				target_name = "sneak_walk"
+				if _find_best_anim("sneak_walk") == "":
+					target_name = "sneak" if _find_best_anim("sneak") != "" else "walk"
+				anim_speed = horizontal_speed / (SPEED * 0.5)
 			else:
-				right_arm.rotation = Vector3(angle + arm_bend, 0, 0)
+				if _find_best_anim("sneaking") != "":
+					target_name = "sneaking"
+				elif _find_best_anim("sneak_idle") != "":
+					target_name = "sneak_idle"
+				elif _find_best_anim("sneak") != "":
+					target_name = "sneak"
+				else:
+					target_name = "idle"
+		elif in_air:
+			if is_moving:
+				target_name = "run" if is_sprinting else "walk"
+				if _find_best_anim(target_name) == "": target_name = "walk"
+				anim_speed = (horizontal_speed / (SPRINT_SPEED if is_sprinting else SPEED)) * 0.8
+			else:
+				target_name = "idle"
+		elif is_moving:
+			if is_sprinting:
+				target_name = "sprint"
+				if _find_best_anim("sprint") == "": 
+					target_name = "run"
+					if _find_best_anim("run") == "":
+						target_name = "walk"
+				anim_speed = horizontal_speed / SPRINT_SPEED
+			else:
+				target_name = "walk"
+				anim_speed = horizontal_speed / SPEED
+		else:
+			target_name = "idle"
+
+		var final_anim = _find_best_anim(target_name)
+		if final_anim != "":
+			if _model_anim.current_animation != final_anim:
+				_model_anim.play(final_anim, 0.2)
 			
-		left_arm.rotation = Vector3(-angle + arm_bend, 0, 0)
-	else:
-		# Idle / Neutral pose (applies on floor and in air)
-		var breathe = sin(idle_time * 1.5) * 0.05
-		var sway = cos(idle_time * 0.7) * 0.02
-		var arm_bend = sneak_progress * 0.2
+			# Force animation speed to strictly match movement speed
+			# For idle, we use 1.0. For movement, we scale by anim_speed.
+			if target_name.contains("idle"):
+				_model_anim.speed_scale = 1.0
+			else:
+				# We clamp the scale so it doesn't look completely frozen but remains very slow if needed
+				_model_anim.speed_scale = clamp(anim_speed, 0.2, 2.5)
 		
-		for part in [right_leg, left_leg]:
-			if part:
-				part.rotation.x = lerp(part.rotation.x, 0.0, delta * 5.0)
-				part.rotation.y = move_toward(part.rotation.y, 0, delta * 5.0)
-				part.rotation.z = move_toward(part.rotation.z, 0, delta * 5.0)
-		
-		if left_arm:
-			left_arm.rotation.x = lerp(left_arm.rotation.x, breathe + arm_bend, delta * 5.0)
-			left_arm.rotation.z = lerp(left_arm.rotation.z, -abs(sway), delta * 5.0)
-		
-		if is_swinging:
-			var s = sin(swing_progress * PI)
-			right_arm.rotation = Vector3(-s * -0.8 + arm_bend, 0, 0)
-		elif right_arm:
-			var target_x = 0.3 + breathe if is_holding else breathe
-			right_arm.rotation.x = lerp(right_arm.rotation.x, target_x + arm_bend, delta * 5.0)
-			right_arm.rotation.z = lerp(right_arm.rotation.z, abs(sway), delta * 5.0)
+		return
+
+func _update_arm_overrides(_delta):
+	var item = inventory.hotbar[selected_slot]
+	var is_holding = item != null
+	
+	if is_swinging:
+		var s = sin(swing_progress * PI)
+		var target_swing_quat = Quaternion.from_euler(Vector3(s * 1.8, s * 0.4, -s * 0.2))
+		for arm in right_arm_nodes:
+			if not is_instance_valid(arm): continue
+			# 1.0 weight completely overrides any animation from the model for this limb
+			arm.quaternion = arm.quaternion.slerp(target_swing_quat, 1.0)
+	elif is_holding:
+		var target_hold_quat = Quaternion.from_euler(Vector3(0.3, 0, 0))
+		for arm in right_arm_nodes:
+			if not is_instance_valid(arm): continue
+			# 1.0 weight ensures the arm is forced to the hold pose, ignoring glTF arm motion
+			arm.quaternion = arm.quaternion.slerp(target_hold_quat, 1.0)
 
 func _update_selection_box():
 	if raycast.is_colliding() and Input.get_mouse_mode() == Input.MOUSE_MODE_CAPTURED:
@@ -921,7 +1073,15 @@ func _unhandled_input(event):
 	
 	if event is InputEventMouseMotion:
 		rotate_y(-event.relative.x * MOUSE_SENSITIVITY)
-		camera_pitch -= event.relative.y * MOUSE_SENSITIVITY
+		
+		var pitch_change = event.relative.y * MOUSE_SENSITIVITY
+		if current_camera_mode == CameraMode.THIRD_PERSON_FRONT:
+			# Inverted for front view (orbital feel)
+			camera_pitch += pitch_change
+		else:
+			# Non-inverted for standard play (FP and Back view)
+			camera_pitch -= pitch_change
+			
 		camera_pitch = clamp(camera_pitch, -PI/2, PI/2)
 		
 		_apply_rotations()
@@ -950,22 +1110,27 @@ func _unhandled_input(event):
 				_update_held_item_mesh()
 
 func _apply_rotations():
-	if head_node:
-		# Compensate for body tilt when sneaking (waist is -0.4, so we add 0.4)
-		var head_sneak_offset = sneak_progress * 0.4
-		head_node.rotation.x = camera_pitch + head_sneak_offset
-	
-	if raycast_pivot:
-		raycast_pivot.rotation.x = camera_pitch
+	var final_head_pitch = camera_pitch
+	var final_ray_y = 0.0
+	var final_ray_x = camera_pitch
 	
 	if current_camera_mode == CameraMode.THIRD_PERSON_FRONT:
-		# In front view, the spring arm is rotated 180 degrees on Y.
-		# This inverts the X axis relative to the player, so we must invert the pitch.
-		spring_arm.rotation.x = -camera_pitch
-	else:
-		spring_arm.rotation.x = camera_pitch
-		if raycast_pivot:
-			raycast_pivot.rotation.y = 0
+		# In front view, invert the head pitch logic as requested
+		final_head_pitch = -camera_pitch
+		
+		# Aim forward (opposite of camera viewpoint) and match the inverted pitch intention.
+		final_ray_y = 0.0
+		final_ray_x = -camera_pitch
+	
+	for head in head_nodes:
+		head.rotation.x = final_head_pitch
+	
+	if raycast_pivot:
+		raycast_pivot.rotation.x = final_ray_x
+		raycast_pivot.rotation.y = final_ray_y
+	
+	# Rotate camera arm
+	spring_arm.rotation.x = camera_pitch
 
 func _pick_block():
 	if raycast.is_colliding():
@@ -991,6 +1156,9 @@ func _pick_block():
 		
 		var block_type = world.get_block(block_pos)
 		
+		if block_type == 11 or block_type == 12:
+			block_type = 5
+
 		if block_type >= 0:
 			var state_gm = get_node_or_null("/root/GameState")
 			if state_gm and state_gm.gamemode == state_gm.GameMode.CREATIVE:
@@ -1119,8 +1287,17 @@ func _place_block():
 
 		swing()
 
+		var type_to_place = item.type
+		if type_to_place == 5 or type_to_place == 11 or type_to_place == 12: # ANY WOOD
+			if abs(hit_normal.x) > 0.5:
+				type_to_place = 11 # WOOD_X
+			elif abs(hit_normal.z) > 0.5:
+				type_to_place = 12 # WOOD_Z
+			else:
+				type_to_place = 5 # WOOD_Y
+
 		if world.has_method("set_block"):
-			world.set_block(block_pos, item.type)
+			world.set_block(block_pos, type_to_place)
 			if world.has_method("play_place_sound"):
 				world.play_place_sound(Vector3(block_pos), item.type)
 			var state_gm = get_node_or_null("/root/GameState")

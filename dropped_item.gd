@@ -67,12 +67,17 @@ func _ready():
 		smat.set_shader_parameter("side_texture", load("res://textures/grass_side.png"))
 		smat.set_shader_parameter("bottom_texture", load("res://textures/dirt.png"))
 		mat = smat
-	elif type == 5: # Wood
+	elif type == 5 or type == 11 or type == 12: # Wood
 		var smat = ShaderMaterial.new()
-		smat.shader = shader
+		smat.shader = load("res://voxel_rotated.gdshader") # Use rotated shader for logs
 		smat.set_shader_parameter("top_texture", load("res://textures/oak_wood_top.png"))
 		smat.set_shader_parameter("side_texture", load("res://textures/oak_wood_side.png"))
 		smat.set_shader_parameter("bottom_texture", load("res://textures/oak_wood_top.png"))
+		
+		var uv = Vector3(0, 1, 0)
+		if type == 11: uv = Vector3(1, 0, 0)
+		if type == 12: uv = Vector3(0, 0, 1)
+		smat.set_shader_parameter("up_vector", uv)
 		mat = smat
 	else:
 		var smat = ShaderMaterial.new()

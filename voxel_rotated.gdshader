@@ -4,6 +4,7 @@ render_mode blend_mix, depth_draw_opaque, cull_back, diffuse_lambert, specular_s
 uniform sampler2D top_texture : source_color, filter_nearest;
 uniform sampler2D side_texture : source_color, filter_nearest;
 uniform sampler2D bottom_texture : source_color, filter_nearest;
+uniform vec3 up_vector = vec3(0.0, 1.0, 0.0);
 
 varying vec3 v_normal;
 
@@ -12,9 +13,9 @@ void vertex() {
 }
 
 void fragment() {
-	// Standard up vector is (0, 1, 0)
+	// Normalize just in case interpolation affected it
 	vec3 n = normalize(v_normal);
-	float dot_up = n.y;
+	float dot_up = dot(n, up_vector);
 	
 	vec4 albedo;
 	if (dot_up > 0.5) {

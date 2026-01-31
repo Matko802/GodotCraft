@@ -5,7 +5,7 @@ extends Node3D
 @export var world_seed = "GodotCraft"
 @export var render_distance = 4
 
-enum BlockType { STONE, DIRT, GRASS, SAND, BEDROCK, WOOD, LEAVES, WATER, WATER_FLOW, TORCH, COARSE_DIRT }
+enum BlockType { STONE, DIRT, GRASS, SAND, BEDROCK, WOOD, LEAVES, WATER, WATER_FLOW, TORCH, COARSE_DIRT, WOOD_X, WOOD_Z }
 
 const BLOCK_TEXTURES = {
 	0: "res://textures/stone.png",
@@ -16,7 +16,9 @@ const BLOCK_TEXTURES = {
 	5: "res://textures/oak_wood_side.png",
 	6: "res://textures/leaves.png",
 	9: "res://models/block/torch/torch_0.png",
-	10: "res://textures/dirt.png" # Placeholder for coarse dirt if not present
+	10: "res://textures/dirt.png",
+	11: "res://textures/oak_wood_side.png",
+	12: "res://textures/oak_wood_side.png"
 }
 
 const BLOCK_SOUNDS = {
@@ -61,6 +63,8 @@ const TYPE_TO_SOUND = {
 	BlockType.GRASS: "grass",
 	BlockType.SAND: "sand",
 	BlockType.WOOD: "wood",
+	BlockType.WOOD_X: "wood",
+	BlockType.WOOD_Z: "wood",
 	BlockType.LEAVES: "grass",
 	BlockType.TORCH: "wood",
 	BlockType.COARSE_DIRT: "gravel"
@@ -752,14 +756,25 @@ func _setup_materials():
 	materials[BlockType.GRASS] = grass_mat
 
 	# Wood Multi-texture
+	var rotated_shader = load("res://voxel_rotated.gdshader")
+	
 	var wood_mat = ShaderMaterial.new()
-	wood_mat.shader = load("res://voxel.gdshader")
+	wood_mat.shader = rotated_shader
 	if ResourceLoader.exists("res://textures/oak_wood_top.png"):
 		wood_mat.set_shader_parameter("top_texture", load("res://textures/oak_wood_top.png"))
 		wood_mat.set_shader_parameter("bottom_texture", load("res://textures/oak_wood_top.png"))
 	if ResourceLoader.exists("res://textures/oak_wood_side.png"):
 		wood_mat.set_shader_parameter("side_texture", load("res://textures/oak_wood_side.png"))
+	wood_mat.set_shader_parameter("up_vector", Vector3(0, 1, 0))
 	materials[BlockType.WOOD] = wood_mat
+
+	var wood_x_mat = wood_mat.duplicate()
+	wood_x_mat.set_shader_parameter("up_vector", Vector3(1, 0, 0))
+	materials[BlockType.WOOD_X] = wood_x_mat
+
+	var wood_z_mat = wood_mat.duplicate()
+	wood_z_mat.set_shader_parameter("up_vector", Vector3(0, 0, 1))
+	materials[BlockType.WOOD_Z] = wood_z_mat
 
 	# Torch Mesh Setup
 	var torch_scene = load("res://models/block/torch/torch.gltf").instantiate()
