@@ -116,7 +116,7 @@ enum CameraMode { FIRST_PERSON, THIRD_PERSON_BACK, THIRD_PERSON_FRONT }
 var current_camera_mode = CameraMode.FIRST_PERSON
 
 var view_model_base_pos = Vector3.ZERO
-var view_model_base_rot = Vector3(0.1, -0.2, 0) # Slight inward tilt for natural look
+var view_model_base_rot = Vector3.ZERO
 
 func _die():
 	var state = get_node_or_null("/root/GameState")
@@ -822,8 +822,8 @@ func _update_view_model(_delta = 0.0):
 	if current_camera_mode == CameraMode.FIRST_PERSON:
 		view_model_arm.visible = true
 		view_model_arm.scale = Vector3.ONE
-		# Adjusted base position to be more Minecraft-authentic (further right and lower)
-		view_model_base_pos = Vector3(0.55, -0.55, -0.7)
+		# Position slightly lower and further away
+		view_model_base_pos = Vector3(0.4, -0.5, -0.8)
 	else:
 		view_model_arm.visible = false
 
@@ -880,21 +880,12 @@ func _animate_walk(delta):
 	
 	# View model bobbing & swing
 	if view_model_arm:
-		var swing_rot = Vector3.ZERO
+		var swing_rot = 0.0
 		var swing_pos = Vector3.ZERO
 		if is_swinging:
-			# Minecraft-style swing curve: quick punch forward and down, then return
-			var s = swing_progress
-			var curve = sin(s * PI)
-			# Rotation: Swing down (X), inward (Y), and tilt (Z)
-			swing_rot.x = -curve * 1.1
-			swing_rot.y = curve * 0.6
-			swing_rot.z = -curve * 0.3
-			
-			# Position: Thrust forward (Z) and slightly left (X)
-			swing_pos.z = -curve * 0.3
-			swing_pos.x = -curve * 0.1
-			swing_pos.y = curve * 0.1
+			var s = sin(swing_progress * PI)
+			swing_rot = s * 0.5
+			swing_pos = Vector3(0, s * 0.1, -s * 0.2)
 		
 		# Intensity of bobbing scales with speed
 		var bob_intensity = clamp(horizontal_speed / SPRINT_SPEED, 0.0, 1.0)
@@ -903,14 +894,10 @@ func _animate_walk(delta):
 		var bob_x = sin(walk_time * 0.5) * 0.02 * bob_intensity
 		var bob_y = abs(cos(walk_time)) * 0.02 * bob_intensity
 		
-		view_model_arm.position.x = lerp(view_model_arm.position.x, view_model_base_pos.x + swing_pos.x + bob_x, delta * 15.0)
-		view_model_arm.position.y = lerp(view_model_arm.position.y, view_model_base_pos.y + swing_pos.y - bob_y, delta * 15.0)
-		view_model_arm.position.z = lerp(view_model_arm.position.z, view_model_base_pos.z + swing_pos.z, delta * 15.0)
-		
-		# Apply combined rotation
-		view_model_arm.rotation.x = lerp(view_model_arm.rotation.x, view_model_base_rot.x + swing_rot.x, delta * 20.0)
-		view_model_arm.rotation.y = lerp(view_model_arm.rotation.y, view_model_base_rot.y + swing_rot.y, delta * 20.0)
-		view_model_arm.rotation.z = lerp(view_model_arm.rotation.z, view_model_base_rot.z + swing_rot.z, delta * 20.0)
+		view_model_arm.position.x = lerp(view_model_arm.position.x, view_model_base_pos.x + swing_pos.x + bob_x, delta * 10.0)
+		view_model_arm.position.y = lerp(view_model_arm.position.y, view_model_base_pos.y + swing_pos.y - bob_y, delta * 10.0)
+		view_model_arm.position.z = lerp(view_model_arm.position.z, view_model_base_pos.z + swing_pos.z, delta * 10.0)
+		view_model_arm.rotation.x = lerp(view_model_arm.rotation.x, view_model_base_rot.x + swing_rot, delta * 15.0)
 
 	# Model Animation handling
 	if _model_anim:
