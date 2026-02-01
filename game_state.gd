@@ -192,13 +192,16 @@ func get_sound(path: String) -> AudioStream:
 	if remote_sound_cache.has(path):
 		return remote_sound_cache[path]
 	
-	if OS.has_feature("web"):
-		# On web, if it's not in the remote cache, we don't try local load
-		return null
-		
-	# Fallback to local load for PC
+	# Try local load (fallback for both Web and PC)
 	if ResourceLoader.exists(path):
-		return load(path)
+		var s = load(path)
+		if s: return s
+	
+	# Aggressive attempt if exists() lied (happens on some Web exports)
+	if path.begins_with("res://"):
+		var s = load(path)
+		if s: return s
+		
 	return null
 
 func _apply_initial_audio_settings():
@@ -210,11 +213,10 @@ func _apply_initial_audio_settings():
 	pickup_volume = pickup_volume
 
 func _ensure_audio_buses():
-	print("Ensuring audio buses...")
+	print("[GodotCraft] Ensuring audio buses...")
 	var master_idx = AudioServer.get_bus_index("Master")
-	print("Master bus index: ", master_idx)
 	if master_idx != -1:
-		print("Master bus volume: ", AudioServer.get_bus_volume_db(master_idx))
+		print("[GodotCraft] Master bus index: ", master_idx, " Vol: ", AudioServer.get_bus_volume_db(master_idx))
 		AudioServer.set_bus_mute(master_idx, false)
 
 	for bus_name in ["Blocks", "Damage", "Pickup"]:
@@ -224,12 +226,11 @@ func _ensure_audio_buses():
 			AudioServer.add_bus(idx)
 			AudioServer.set_bus_name(idx, bus_name)
 			AudioServer.set_bus_send(idx, "Master")
-			print("Created bus: ", bus_name, " at index: ", idx)
+			print("[GodotCraft] Created bus: ", bus_name, " at index: ", idx)
 		else:
 			AudioServer.set_bus_send(idx, "Master")
-			print("Found existing bus: ", bus_name, " at index: ", idx)
+			print("[GodotCraft] Found existing bus: ", bus_name, " at index: ", idx)
 		
-		# Ensure not muted
 		AudioServer.set_bus_mute(idx, false)
 
 func _input(event):

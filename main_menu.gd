@@ -306,9 +306,8 @@ func _on_back_to_main_pressed():
 func _resume_web_audio():
 	if not OS.has_feature("web"): return
 	
-	print("Attempting to resume Web audio...")
+	print("[GodotCraft] Attempting to resume Web audio...")
 	# Godot 4 Web audio resume logic
-	AudioServer.set_bus_mute(0, true)
 	AudioServer.set_bus_mute(0, false)
 	
 	# Explicitly resume via JavaScript
@@ -316,32 +315,40 @@ func _resume_web_audio():
 		JavaScriptBridge.eval("""
 			(function() {
 				var resume = function() {
-					if (typeof Module !== 'undefined' && Module.audioContext) {
-						if (Module.audioContext.state === 'suspended') {
-							Module.audioContext.resume().then(function() {
-								console.log('[GodotCraft] AudioContext resumed via Module');
-							});
-						}
-					}
-					// Fallback
 					var context = window.AudioContext || window.webkitAudioContext;
 					if (context) {
-						var tempCtx = new context();
-						if (tempCtx.state === 'suspended') {
-							tempCtx.resume();
+						// Iterate through all possible contexts Godot might be using
+						if (typeof Module !== 'undefined' && Module.audioContext) {
+							Module.audioContext.resume().then(() => console.log('[JS] Module.audioContext resumed'));
 						}
+						
+						// Try to find any other contexts
+						var dummy = new (window.AudioContext || window.webkitAudioContext)();
+						dummy.resume();
 					}
 				};
 				resume();
+				// Also add a listener to document to resume on next click just in case
+				document.addEventListener('click', resume, { once: true });
+				document.addEventListener('keydown', resume, { once: true });
 			})();
 		""")
 	
-	# Unmute all custom buses too
+	# Unmute all custom buses and reset volumes to ensure they are audible
+	var state = get_node_or_null("/root/GameState")
 	for bus_name in ["Master", "Blocks", "Damage", "Pickup"]:
 		var idx = AudioServer.get_bus_index(bus_name)
 		if idx != -1:
 			AudioServer.set_bus_mute(idx, false)
-			print("Bus ", bus_name, " status: Muted=", AudioServer.is_bus_mute(idx), " Vol=", AudioServer.get_bus_volume_db(idx))
+			var vol = 1.0
+			if state:
+				match bus_name:
+					"Master": vol = state.master_volume
+					"Blocks": vol = state.blocks_volume
+					"Damage": vol = state.damage_volume
+					"Pickup": vol = state.pickup_volume
+			AudioServer.set_bus_volume_db(idx, linear_to_db(vol))
+			print("[GodotCraft] Bus ", bus_name, " unmuted and volume set to ", vol)
 
 func _on_create_pressed():
 	var world_name = world_name_input.text.strip_edges()
