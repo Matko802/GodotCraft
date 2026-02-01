@@ -139,19 +139,23 @@ func _update_version_label():
 func _input(event):
 	if OS.has_feature("web"):
 		if event is InputEventMouseButton or event is InputEventKey:
-			# Force the audio context to resume on first interaction
-			# Toggling mute is a reliable way to kick the AudioServer in Godot 4 web exports
-			var was_muted = AudioServer.is_bus_mute(0)
+			# Godot 4 Web audio resume logic
 			AudioServer.set_bus_mute(0, true)
-			AudioServer.set_bus_mute(0, was_muted)
+			AudioServer.set_bus_mute(0, false)
 			
-			# Ensure volumes are applied
+			# Ensure Master volume is actually set
+			var master_idx = AudioServer.get_bus_index("Master")
+			if master_idx != -1:
+				AudioServer.set_bus_mute(master_idx, false)
+			
 			var state = get_node_or_null("/root/GameState")
-			if state and state.has_method("_apply_initial_audio_settings"):
+			if state:
 				state._apply_initial_audio_settings()
 				
-			print("Web audio context resumed via user interaction")
-			set_process_input(false) # Only need once
+			print("Web audio interaction detected. AudioServer status: ", not AudioServer.is_bus_mute(0))
+			# Keep processing input for a few more frames to be safe, 
+			# or just stop if we're confident. We'll stop now.
+			set_process_input(false)
 
 func _style_all_buttons():
 	# Find all buttons and other controls in the scene

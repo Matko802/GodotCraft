@@ -113,12 +113,22 @@ func _apply_initial_audio_settings():
 	pickup_volume = pickup_volume
 
 func _ensure_audio_buses():
+	print("Ensuring audio buses...")
 	for bus_name in ["Blocks", "Damage", "Pickup"]:
-		if AudioServer.get_bus_index(bus_name) == -1:
+		var idx = AudioServer.get_bus_index(bus_name)
+		if idx == -1:
 			var bus_count = AudioServer.bus_count
 			AudioServer.add_bus(bus_count)
 			AudioServer.set_bus_name(bus_count, bus_name)
 			AudioServer.set_bus_send(bus_count, "Master")
+			print("Created bus: ", bus_name, " at index: ", bus_count)
+		else:
+			AudioServer.set_bus_send(idx, "Master")
+			print("Found existing bus: ", bus_name, " at index: ", idx)
+	
+	# Final check of master
+	var m_idx = AudioServer.get_bus_index("Master")
+	print("Master bus index: ", m_idx, " Volume: ", AudioServer.get_bus_volume_db(m_idx))
 
 func _input(event):
 	if event is InputEventKey and event.pressed and event.keycode == KEY_F11:

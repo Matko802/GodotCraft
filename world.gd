@@ -281,12 +281,15 @@ func spawn_break_particles(pos: Vector3, type: int):
 var _sound_cache = {}
 
 func play_break_sound(pos: Vector3, type: int):
+	print("Playing break sound at: ", pos, " for type: ", type)
 	var category = TYPE_TO_SOUND.get(type, "stone")
 	var sound_paths = BLOCK_SOUNDS.get(category, BLOCK_SOUNDS["stone"])
 	var sound_path = sound_paths[randi() % sound_paths.size()]
 	
 	var stream = _get_sound(sound_path)
-	if not stream: return
+	if not stream: 
+		print("Failed to load sound stream for path: ", sound_path)
+		return
 	
 	var audio = AudioStreamPlayer3D.new()
 	audio.stream = stream

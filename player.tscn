@@ -81,6 +81,9 @@ margin = 0.15
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.7397363, 0)
 cull_mask = 1048573
 
+[node name="AudioListener3D" type="AudioListener3D" parent="SpringArm3D/Camera3D" unique_id=877678405]
+current = true
+
 [node name="ViewModelLayer" type="CanvasLayer" parent="." unique_id=1766187173]
 layer = 0
 
