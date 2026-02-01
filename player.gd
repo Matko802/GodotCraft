@@ -98,18 +98,13 @@ func _get_sound(path: String) -> AudioStream:
 		return _sound_cache[path]
 	
 	var state = get_node_or_null("/root/GameState")
-	var s = null
 	if state:
-		s = state.get_sound(path)
+		var s = state.get_sound(path)
+		if s:
+			_sound_cache[path] = s
+			return s
 	
-	if not s:
-		s = load(path)
-		
-	if s:
-		_sound_cache[path] = s
-	else:
-		print("ERROR: Failed to load sound: ", path)
-	return s
+	return null
 
 func _play_fall_sound(dist: float):
 	var sound_path = ""

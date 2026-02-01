@@ -191,7 +191,11 @@ func get_sound(path: String) -> AudioStream:
 	if remote_sound_cache.has(path):
 		return remote_sound_cache[path]
 	
-	# Fallback to local load
+	if OS.has_feature("web"):
+		# On web, if it's not in the remote cache, we don't try local load
+		return null
+		
+	# Fallback to local load for PC
 	if ResourceLoader.exists(path):
 		return load(path)
 	return null

@@ -308,18 +308,13 @@ func _get_sound(path: String) -> AudioStream:
 		return _sound_cache[path]
 	
 	var state = get_node_or_null("/root/GameState")
-	var s = null
 	if state:
-		s = state.get_sound(path)
+		var s = state.get_sound(path)
+		if s:
+			_sound_cache[path] = s
+			return s
 	
-	if not s:
-		s = load(path)
-	
-	if s:
-		_sound_cache[path] = s
-	else:
-		print("ERROR: Failed to load sound: ", path)
-	return s
+	return null
 
 func play_place_sound(pos: Vector3, type: int):
 	var category = TYPE_TO_SOUND.get(type, "stone")
@@ -452,9 +447,10 @@ func _gather_assets():
 	paths.append("res://textures/sky/moon.png")
 	
 	# Sounds
-	for cat in BLOCK_SOUNDS:
-		for s in BLOCK_SOUNDS[cat]:
-			paths.append(s)
+	if not OS.has_feature("web"):
+		for cat in BLOCK_SOUNDS:
+			for s in BLOCK_SOUNDS[cat]:
+				paths.append(s)
 	
 	# Models
 	paths.append("res://models/block/torch/torch.gltf")

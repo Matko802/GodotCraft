@@ -213,9 +213,16 @@ func _process(delta):
 
 func _play_pickup_sound():
 	var sound_path = "res://textures/Sounds/random/pop.ogg"
-	var stream = load(sound_path)
+	var stream = null
+	var state = get_node_or_null("/root/GameState")
+	if state:
+		stream = state.get_sound(sound_path)
+	
 	if not stream:
-		print("ERROR: Failed to load pickup sound: ", sound_path)
+		if not OS.has_feature("web"):
+			stream = load(sound_path)
+			
+	if not stream:
 		return
 	
 	var audio = AudioStreamPlayer.new()
