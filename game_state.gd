@@ -99,6 +99,7 @@ var remote_sound_cache = {}
 var _pending_sounds = []
 var _is_downloading = false
 var _current_http: HTTPRequest = null
+var _currently_downloading_path = ""
 
 signal all_remote_sounds_loaded
 
@@ -161,6 +162,7 @@ func _download_next_sound():
 		
 	_is_downloading = true
 	var res_path = _pending_sounds.pop_front()
+	_currently_downloading_path = res_path
 	var url = res_path.replace("res://", REMOTE_BASE_URL)
 	
 	if _current_http == null:
@@ -175,13 +177,12 @@ func _download_next_sound():
 
 func _on_sound_download_completed(result, response_code, _headers, body):
 	if result == HTTPRequest.RESULT_SUCCESS and response_code == 200:
-		var res_path = SOUND_LIST[SOUND_LIST.size() - _pending_sounds.size() - 1]
 		var stream = AudioStreamOggVorbis.load_from_buffer(body)
 		if stream:
-			remote_sound_cache[res_path] = stream
-			# print("Downloaded: ", res_path)
+			remote_sound_cache[_currently_downloading_path] = stream
+			# print("Downloaded: ", _currently_downloading_path)
 		else:
-			print("ERROR: Failed to parse OGG from: ", res_path)
+			print("ERROR: Failed to parse OGG from: ", _currently_downloading_path)
 	else:
 		print("ERROR: Download failed with code: ", response_code)
 		

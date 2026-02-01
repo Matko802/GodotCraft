@@ -429,8 +429,23 @@ func _ready():
 		_current_stage = LoadingStage.CHUNKS
 		update_chunks(p_pos)
 	else:
-		for path in _assets_to_load:
-			ResourceLoader.load_threaded_request(path)
+		if OS.has_feature("web"):
+			# On Web, we'll load them one by one to avoid thread issues
+			_load_assets_web()
+		else:
+			for path in _assets_to_load:
+				ResourceLoader.load_threaded_request(path)
+
+func _load_assets_web():
+	for path in _assets_to_load:
+		# Use load() directly, it's safer on Web
+		var _res = load(path)
+		_loaded_assets += 1
+		# Yield to keep UI somewhat responsive
+		await get_tree().process_frame
+	
+	print("Web: All assets loaded synchronously.")
+	# stage will be updated in _process once _loaded_assets == _total_assets
 
 func _gather_assets():
 	var paths = []
@@ -802,20 +817,24 @@ func _setup_materials():
 	materials[BlockType.WOOD_Z] = wood_z_mat
 
 	# Torch Mesh Setup
-	var torch_scene = load("res://models/block/torch/torch.gltf").instantiate()
-	var torch_mesh_instances = torch_scene.find_children("*", "MeshInstance3D", true)
-	if not torch_mesh_instances.is_empty():
-		var torch_model_mesh_instance = torch_mesh_instances[0]
-		torch_mesh = torch_model_mesh_instance.mesh
-		torch_material = torch_model_mesh_instance.mesh.surface_get_material(0)
-		if not torch_material:
-			torch_material = torch_model_mesh_instance.material_override
-		
-		# Make torch always bright
-		if torch_material:
-			torch_material = torch_material.duplicate()
-			torch_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	torch_scene.free()
+	var torch_res = load("res://models/block/torch/torch.gltf")
+	if torch_res:
+		var torch_scene = torch_res.instantiate()
+		var torch_mesh_instances = torch_scene.find_children("*", "MeshInstance3D", true)
+		if not torch_mesh_instances.is_empty():
+			var torch_model_mesh_instance = torch_mesh_instances[0]
+			torch_mesh = torch_model_mesh_instance.mesh
+			torch_material = torch_model_mesh_instance.mesh.surface_get_material(0)
+			if not torch_material:
+				torch_material = torch_model_mesh_instance.material_override
+			
+			# Make torch always bright
+			if torch_material:
+				torch_material = torch_material.duplicate()
+				torch_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		torch_scene.free()
+	else:
+		print("WARNING: Could not load torch model")
 
 func _process(delta):
 	if is_loading:
@@ -824,20 +843,24 @@ func _process(delta):
 
 		if _current_stage == LoadingStage.ASSETS:
 			var all_done = true
-			var loaded_count = 0
-			for path in _assets_to_load:
-				var status = ResourceLoader.load_threaded_get_status(path)
-				if status == ResourceLoader.THREAD_LOAD_LOADED:
-					# Actually pull it into memory
-					var _res = ResourceLoader.load_threaded_get(path)
-					loaded_count += 1
-				elif status == ResourceLoader.THREAD_LOAD_FAILED:
-					print("ERROR: Failed to preload asset: ", path)
-					loaded_count += 1 # Count it as "handled" even if failed
-				else:
+			if not OS.has_feature("web"):
+				var loaded_count = 0
+				for path in _assets_to_load:
+					var status = ResourceLoader.load_threaded_get_status(path)
+					if status == ResourceLoader.THREAD_LOAD_LOADED:
+						# Actually pull it into memory
+						var _res = ResourceLoader.load_threaded_get(path)
+						loaded_count += 1
+					elif status == ResourceLoader.THREAD_LOAD_FAILED:
+						print("ERROR: Failed to preload asset: ", path)
+						loaded_count += 1 # Count it as "handled" even if failed
+					else:
+						all_done = false
+				_loaded_assets = loaded_count
+			else:
+				# On web, _load_assets_web handles incrementing _loaded_assets
+				if _loaded_assets < _total_assets:
 					all_done = false
-			
-			_loaded_assets = loaded_count
 			
 			if all_done:
 				print("All assets preloaded successfully (including failures).")
