@@ -317,24 +317,26 @@ func _resume_web_audio():
 				var resume = function() {
 					var context = window.AudioContext || window.webkitAudioContext;
 					if (context) {
-						// Iterate through all possible contexts Godot might be using
+						// Resume all potential contexts
 						if (typeof Module !== 'undefined' && Module.audioContext) {
-							Module.audioContext.resume().then(() => console.log('[JS] Module.audioContext resumed'));
+							Module.audioContext.resume();
 						}
 						
-						// Try to find any other contexts
+						// Create and resume a dummy context to poke the system
 						var dummy = new (window.AudioContext || window.webkitAudioContext)();
 						dummy.resume();
 					}
+					console.log('[GodotCraft JS] Audio resume attempt triggered');
 				};
 				resume();
-				// Also add a listener to document to resume on next click just in case
-				document.addEventListener('click', resume, { once: true });
-				document.addEventListener('keydown', resume, { once: true });
+				// Persistent listeners to ensure resume on any interaction
+				window.addEventListener('mousedown', resume, { once: false });
+				window.addEventListener('keydown', resume, { once: false });
+				window.addEventListener('touchstart', resume, { once: false });
 			})();
 		""")
 	
-	# Unmute all custom buses and reset volumes to ensure they are audible
+	# Force unmute and volume reset for all standard buses
 	var state = get_node_or_null("/root/GameState")
 	for bus_name in ["Master", "Blocks", "Damage", "Pickup"]:
 		var idx = AudioServer.get_bus_index(bus_name)
@@ -348,7 +350,6 @@ func _resume_web_audio():
 					"Damage": vol = state.damage_volume
 					"Pickup": vol = state.pickup_volume
 			AudioServer.set_bus_volume_db(idx, linear_to_db(vol))
-			print("[GodotCraft] Bus ", bus_name, " unmuted and volume set to ", vol)
 
 func _on_create_pressed():
 	var world_name = world_name_input.text.strip_edges()
