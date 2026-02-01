@@ -95,6 +95,46 @@ const SETTINGS_PATH = "user://settings.cfg"
 const SAVES_DIR = "user://saves/"
 const SKINS_DIR = "user://skins/"
 
+var remote_sound_cache = {}
+var _pending_sounds = []
+var _is_downloading = false
+var _current_http: HTTPRequest = null
+
+signal all_remote_sounds_loaded
+
+const REMOTE_BASE_URL = "https://raw.githubusercontent.com/Matko802/GodotCraft/main/"
+
+const SOUND_LIST = [
+	"res://textures/Sounds/block_broke/stone1.ogg",
+	"res://textures/Sounds/block_broke/stone2.ogg",
+	"res://textures/Sounds/block_broke/stone3.ogg",
+	"res://textures/Sounds/block_broke/stone4.ogg",
+	"res://textures/Sounds/block_broke/gravel1.ogg",
+	"res://textures/Sounds/block_broke/gravel2.ogg",
+	"res://textures/Sounds/block_broke/gravel3.ogg",
+	"res://textures/Sounds/block_broke/gravel4.ogg",
+	"res://textures/Sounds/block_breaking/grass1.ogg",
+	"res://textures/Sounds/block_breaking/grass2.ogg",
+	"res://textures/Sounds/block_breaking/grass3.ogg",
+	"res://textures/Sounds/block_breaking/grass4.ogg",
+	"res://textures/Sounds/block_breaking/sand1.ogg",
+	"res://textures/Sounds/block_breaking/sand2.ogg",
+	"res://textures/Sounds/block_breaking/sand3.ogg",
+	"res://textures/Sounds/block_breaking/sand4.ogg",
+	"res://textures/Sounds/block_breaking/wood1.ogg",
+	"res://textures/Sounds/block_breaking/wood2.ogg",
+	"res://textures/Sounds/block_breaking/wood3.ogg",
+	"res://textures/Sounds/block_breaking/wood4.ogg",
+	"res://textures/Sounds/block_hit/stone1.ogg",
+	"res://textures/Sounds/damage/hit1.ogg",
+	"res://textures/Sounds/damage/hit2.ogg",
+	"res://textures/Sounds/damage/hit3.ogg",
+	"res://textures/Sounds/damage/fallsmall.ogg",
+	"res://textures/Sounds/damage/fallbig1.ogg",
+	"res://textures/Sounds/damage/fallbig2.ogg",
+	"res://textures/Sounds/random/pop.ogg"
+]
+
 func _ready():
 	_ensure_audio_buses()
 	load_settings()
@@ -103,6 +143,58 @@ func _ready():
 		DirAccess.make_dir_absolute(SAVES_DIR)
 	if not DirAccess.dir_exists_absolute(SKINS_DIR):
 		DirAccess.make_dir_absolute(SKINS_DIR)
+	
+	if OS.has_feature("web"):
+		call_deferred("_start_remote_sound_download")
+
+func _start_remote_sound_download():
+	print("[GodotCraft] Web detected. Starting remote sound download from GitHub...")
+	_pending_sounds = SOUND_LIST.duplicate()
+	_download_next_sound()
+
+func _download_next_sound():
+	if _pending_sounds.is_empty():
+		print("[GodotCraft] All remote sounds downloaded.")
+		_is_downloading = false
+		all_remote_sounds_loaded.emit()
+		return
+		
+	_is_downloading = true
+	var res_path = _pending_sounds.pop_front()
+	var url = res_path.replace("res://", REMOTE_BASE_URL)
+	
+	if _current_http == null:
+		_current_http = HTTPRequest.new()
+		add_child(_current_http)
+		_current_http.request_completed.connect(_on_sound_download_completed)
+	
+	var err = _current_http.request(url)
+	if err != OK:
+		print("ERROR: Failed to start request for: ", url)
+		_download_next_sound()
+
+func _on_sound_download_completed(result, response_code, _headers, body):
+	if result == HTTPRequest.RESULT_SUCCESS and response_code == 200:
+		var res_path = SOUND_LIST[SOUND_LIST.size() - _pending_sounds.size() - 1]
+		var stream = AudioStreamOggVorbis.load_from_buffer(body)
+		if stream:
+			remote_sound_cache[res_path] = stream
+			# print("Downloaded: ", res_path)
+		else:
+			print("ERROR: Failed to parse OGG from: ", res_path)
+	else:
+		print("ERROR: Download failed with code: ", response_code)
+		
+	_download_next_sound()
+
+func get_sound(path: String) -> AudioStream:
+	if remote_sound_cache.has(path):
+		return remote_sound_cache[path]
+	
+	# Fallback to local load
+	if ResourceLoader.exists(path):
+		return load(path)
+	return null
 
 func _apply_initial_audio_settings():
 	# Explicitly call setters to ensure AudioServer reflects current values

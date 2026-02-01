@@ -96,7 +96,15 @@ var _sound_cache = {}
 func _get_sound(path: String) -> AudioStream:
 	if _sound_cache.has(path):
 		return _sound_cache[path]
-	var s = load(path)
+	
+	var state = get_node_or_null("/root/GameState")
+	var s = null
+	if state:
+		s = state.get_sound(path)
+	
+	if not s:
+		s = load(path)
+		
 	if s:
 		_sound_cache[path] = s
 	else:
