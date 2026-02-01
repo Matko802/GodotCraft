@@ -114,21 +114,26 @@ func _apply_initial_audio_settings():
 
 func _ensure_audio_buses():
 	print("Ensuring audio buses...")
+	var master_idx = AudioServer.get_bus_index("Master")
+	print("Master bus index: ", master_idx)
+	if master_idx != -1:
+		print("Master bus volume: ", AudioServer.get_bus_volume_db(master_idx))
+		AudioServer.set_bus_mute(master_idx, false)
+
 	for bus_name in ["Blocks", "Damage", "Pickup"]:
 		var idx = AudioServer.get_bus_index(bus_name)
 		if idx == -1:
-			var bus_count = AudioServer.bus_count
-			AudioServer.add_bus(bus_count)
-			AudioServer.set_bus_name(bus_count, bus_name)
-			AudioServer.set_bus_send(bus_count, "Master")
-			print("Created bus: ", bus_name, " at index: ", bus_count)
+			idx = AudioServer.bus_count
+			AudioServer.add_bus(idx)
+			AudioServer.set_bus_name(idx, bus_name)
+			AudioServer.set_bus_send(idx, "Master")
+			print("Created bus: ", bus_name, " at index: ", idx)
 		else:
 			AudioServer.set_bus_send(idx, "Master")
 			print("Found existing bus: ", bus_name, " at index: ", idx)
-	
-	# Final check of master
-	var m_idx = AudioServer.get_bus_index("Master")
-	print("Master bus index: ", m_idx, " Volume: ", AudioServer.get_bus_volume_db(m_idx))
+		
+		# Ensure not muted
+		AudioServer.set_bus_mute(idx, false)
 
 func _input(event):
 	if event is InputEventKey and event.pressed and event.keycode == KEY_F11:

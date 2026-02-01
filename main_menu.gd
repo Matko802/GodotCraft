@@ -139,23 +139,41 @@ func _update_version_label():
 func _input(event):
 	if OS.has_feature("web"):
 		if event is InputEventMouseButton or event is InputEventKey:
-			# Godot 4 Web audio resume logic
-			AudioServer.set_bus_mute(0, true)
-			AudioServer.set_bus_mute(0, false)
-			
-			# Ensure Master volume is actually set
-			var master_idx = AudioServer.get_bus_index("Master")
-			if master_idx != -1:
-				AudioServer.set_bus_mute(master_idx, false)
-			
-			var state = get_node_or_null("/root/GameState")
-			if state:
-				state._apply_initial_audio_settings()
+			if event.pressed:
+				print("Web audio interaction detected. Attempting to resume AudioServer...")
+				# Godot 4 Web audio resume logic
+				AudioServer.set_bus_mute(0, true)
+				AudioServer.set_bus_mute(0, false)
 				
-			print("Web audio interaction detected. AudioServer status: ", not AudioServer.is_bus_mute(0))
-			# Keep processing input for a few more frames to be safe, 
-			# or just stop if we're confident. We'll stop now.
-			set_process_input(false)
+				# Explicitly resume via JavaScript if bridge is available
+				if JavaScriptBridge:
+					JavaScriptBridge.eval("""
+						if (typeof Module !== 'undefined' && Module.audioContext) {
+							if (Module.audioContext.state === 'suspended') {
+								Module.audioContext.resume().then(() => {
+									console.log('AudioContext resumed successfully');
+								});
+							}
+						}
+						// Fallback for some versions
+						if (window.AudioContext || window.webkitAudioContext) {
+							var context = (window.AudioContext ? new AudioContext() : new webkitAudioContext());
+							if (context.state === 'suspended') { context.resume(); }
+						}
+					""")
+				
+				# Ensure Master volume is actually set
+				var master_idx = AudioServer.get_bus_index("Master")
+				if master_idx != -1:
+					AudioServer.set_bus_mute(master_idx, false)
+				
+				var state = get_node_or_null("/root/GameState")
+				if state:
+					state._apply_initial_audio_settings()
+					
+				print("AudioServer status: Muted=", AudioServer.is_bus_mute(0), " Volume=", AudioServer.get_bus_volume_db(0))
+				# Stop processing after successful resume
+				set_process_input(false)
 
 func _style_all_buttons():
 	# Find all buttons and other controls in the scene

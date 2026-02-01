@@ -281,22 +281,23 @@ func spawn_break_particles(pos: Vector3, type: int):
 var _sound_cache = {}
 
 func play_break_sound(pos: Vector3, type: int):
-	print("Playing break sound at: ", pos, " for type: ", type)
 	var category = TYPE_TO_SOUND.get(type, "stone")
 	var sound_paths = BLOCK_SOUNDS.get(category, BLOCK_SOUNDS["stone"])
 	var sound_path = sound_paths[randi() % sound_paths.size()]
 	
 	var stream = _get_sound(sound_path)
 	if not stream: 
-		print("Failed to load sound stream for path: ", sound_path)
 		return
 	
 	var audio = AudioStreamPlayer3D.new()
 	audio.stream = stream
-	audio.bus = "Blocks"
+	if AudioServer.get_bus_index("Blocks") != -1:
+		audio.bus = "Blocks"
+	else:
+		audio.bus = "Master"
+	
 	audio.unit_size = 15.0 
 	audio.max_distance = 64.0
-	audio.attenuation_filter_cutoff_hz = 20000.0
 	add_child(audio)
 	audio.global_position = pos + Vector3(0.5, 0.5, 0.5)
 	audio.play()
@@ -306,11 +307,12 @@ func _get_sound(path: String) -> AudioStream:
 	if _sound_cache.has(path):
 		return _sound_cache[path]
 	
-	if ResourceLoader.exists(path):
-		var s = load(path)
+	var s = load(path)
+	if s:
 		_sound_cache[path] = s
-		return s
-	return null
+	else:
+		print("ERROR: Failed to load sound: ", path)
+	return s
 
 func play_place_sound(pos: Vector3, type: int):
 	var category = TYPE_TO_SOUND.get(type, "stone")
@@ -322,7 +324,11 @@ func play_place_sound(pos: Vector3, type: int):
 	
 	var audio = AudioStreamPlayer3D.new()
 	audio.stream = stream
-	audio.bus = "Blocks"
+	if AudioServer.get_bus_index("Blocks") != -1:
+		audio.bus = "Blocks"
+	else:
+		audio.bus = "Master"
+		
 	audio.unit_size = 12.0
 	audio.max_distance = 48.0
 	audio.pitch_scale = randf_range(0.8, 1.2)

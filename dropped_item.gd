@@ -213,11 +213,17 @@ func _process(delta):
 
 func _play_pickup_sound():
 	var sound_path = "res://textures/Sounds/random/pop.ogg"
-	if not ResourceLoader.exists(sound_path): return
+	var stream = load(sound_path)
+	if not stream:
+		print("ERROR: Failed to load pickup sound: ", sound_path)
+		return
 	
 	var audio = AudioStreamPlayer.new()
-	audio.stream = load(sound_path)
-	audio.bus = "Pickup"
+	audio.stream = stream
+	if AudioServer.get_bus_index("Pickup") != -1:
+		audio.bus = "Pickup"
+	else:
+		audio.bus = "Master"
 	# Create a temporary node in the world to play the sound
 	get_tree().root.add_child(audio)
 	audio.play()

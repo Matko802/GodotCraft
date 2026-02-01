@@ -96,11 +96,12 @@ var _sound_cache = {}
 func _get_sound(path: String) -> AudioStream:
 	if _sound_cache.has(path):
 		return _sound_cache[path]
-	if ResourceLoader.exists(path):
-		var s = load(path)
+	var s = load(path)
+	if s:
 		_sound_cache[path] = s
-		return s
-	return null
+	else:
+		print("ERROR: Failed to load sound: ", path)
+	return s
 
 func _play_fall_sound(dist: float):
 	var sound_path = ""
@@ -114,7 +115,10 @@ func _play_fall_sound(dist: float):
 
 	var audio = AudioStreamPlayer.new()
 	audio.stream = stream
-	audio.bus = "Damage"
+	if AudioServer.get_bus_index("Damage") != -1:
+		audio.bus = "Damage"
+	else:
+		audio.bus = "Master"
 	add_child(audio)
 	audio.play()
 	audio.finished.connect(audio.queue_free)
@@ -126,7 +130,10 @@ func _play_damage_sound():
 
 	var audio = AudioStreamPlayer.new()
 	audio.stream = stream
-	audio.bus = "Damage"
+	if AudioServer.get_bus_index("Damage") != -1:
+		audio.bus = "Damage"
+	else:
+		audio.bus = "Master"
 	add_child(audio)
 	audio.play()
 	audio.finished.connect(audio.queue_free)
