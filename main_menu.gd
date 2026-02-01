@@ -140,38 +140,7 @@ func _input(event):
 	if OS.has_feature("web"):
 		if event is InputEventMouseButton or event is InputEventKey:
 			if event.pressed:
-				print("Web audio interaction detected. Attempting to resume AudioServer...")
-				# Godot 4 Web audio resume logic
-				AudioServer.set_bus_mute(0, true)
-				AudioServer.set_bus_mute(0, false)
-				
-				# Explicitly resume via JavaScript if bridge is available
-				if JavaScriptBridge:
-					JavaScriptBridge.eval("""
-						if (typeof Module !== 'undefined' && Module.audioContext) {
-							if (Module.audioContext.state === 'suspended') {
-								Module.audioContext.resume().then(() => {
-									console.log('AudioContext resumed successfully');
-								});
-							}
-						}
-						// Fallback for some versions
-						if (window.AudioContext || window.webkitAudioContext) {
-							var context = (window.AudioContext ? new AudioContext() : new webkitAudioContext());
-							if (context.state === 'suspended') { context.resume(); }
-						}
-					""")
-				
-				# Ensure Master volume is actually set
-				var master_idx = AudioServer.get_bus_index("Master")
-				if master_idx != -1:
-					AudioServer.set_bus_mute(master_idx, false)
-				
-				var state = get_node_or_null("/root/GameState")
-				if state:
-					state._apply_initial_audio_settings()
-					
-				print("AudioServer status: Muted=", AudioServer.is_bus_mute(0), " Volume=", AudioServer.get_bus_volume_db(0))
+				_resume_web_audio()
 				# Stop processing after successful resume
 				set_process_input(false)
 
@@ -314,21 +283,65 @@ func refresh_save_list():
 			save_list.set_item_metadata(save_list.get_item_count() - 1, s_name)
 
 func _on_play_pressed():
+	_resume_web_audio()
 	main_screen.visible = false
 	play_screen.visible = true
 	refresh_save_list()
 
 func _on_settings_pressed():
+	_resume_web_audio()
 	main_screen.visible = false
 	settings_screen.visible = true
 
 func _on_quit_pressed():
+	_resume_web_audio()
 	get_tree().quit()
 
 func _on_back_to_main_pressed():
+	_resume_web_audio()
 	main_screen.visible = true
 	play_screen.visible = false
 	settings_screen.visible = false
+
+func _resume_web_audio():
+	if not OS.has_feature("web"): return
+	
+	print("Attempting to resume Web audio...")
+	# Godot 4 Web audio resume logic
+	AudioServer.set_bus_mute(0, true)
+	AudioServer.set_bus_mute(0, false)
+	
+	# Explicitly resume via JavaScript
+	if JavaScriptBridge:
+		JavaScriptBridge.eval("""
+			(function() {
+				var resume = function() {
+					if (typeof Module !== 'undefined' && Module.audioContext) {
+						if (Module.audioContext.state === 'suspended') {
+							Module.audioContext.resume().then(function() {
+								console.log('[GodotCraft] AudioContext resumed via Module');
+							});
+						}
+					}
+					// Fallback
+					var context = window.AudioContext || window.webkitAudioContext;
+					if (context) {
+						var tempCtx = new context();
+						if (tempCtx.state === 'suspended') {
+							tempCtx.resume();
+						}
+					}
+				};
+				resume();
+			})();
+		""")
+	
+	# Unmute all custom buses too
+	for bus_name in ["Master", "Blocks", "Damage", "Pickup"]:
+		var idx = AudioServer.get_bus_index(bus_name)
+		if idx != -1:
+			AudioServer.set_bus_mute(idx, false)
+			print("Bus ", bus_name, " status: Muted=", AudioServer.is_bus_mute(idx), " Vol=", AudioServer.get_bus_volume_db(idx))
 
 func _on_create_pressed():
 	var world_name = world_name_input.text.strip_edges()

@@ -825,13 +825,19 @@ func _process(delta):
 			for path in _assets_to_load:
 				var status = ResourceLoader.load_threaded_get_status(path)
 				if status == ResourceLoader.THREAD_LOAD_LOADED:
+					# Actually pull it into memory
+					var _res = ResourceLoader.load_threaded_get(path)
 					loaded_count += 1
+				elif status == ResourceLoader.THREAD_LOAD_FAILED:
+					print("ERROR: Failed to preload asset: ", path)
+					loaded_count += 1 # Count it as "handled" even if failed
 				else:
 					all_done = false
 			
 			_loaded_assets = loaded_count
 			
 			if all_done:
+				print("All assets preloaded successfully (including failures).")
 				_current_stage = LoadingStage.CHUNKS
 				update_chunks(p_pos)
 		
