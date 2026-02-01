@@ -49,6 +49,10 @@ var selected_save_index = -1
 func _ready():
 	randomize()
 	
+	# Resume AudioServer on first input (Web requirement)
+	if OS.has_feature("web"):
+		set_process_input(true)
+	
 	print("Checking nodes...")
 	print("browse_texture_button: ", browse_texture_button)
 	print("username_input: ", username_input)
@@ -131,6 +135,23 @@ func _update_version_label():
 	
 	if has_node("VersionLabel"):
 		$VersionLabel.text = "build %s (%s)" % [version, engine_str]
+
+func _input(event):
+	if OS.has_feature("web"):
+		if event is InputEventMouseButton or event is InputEventKey:
+			# Force the audio context to resume on first interaction
+			# Toggling mute is a reliable way to kick the AudioServer in Godot 4 web exports
+			var was_muted = AudioServer.is_bus_mute(0)
+			AudioServer.set_bus_mute(0, true)
+			AudioServer.set_bus_mute(0, was_muted)
+			
+			# Ensure volumes are applied
+			var state = get_node_or_null("/root/GameState")
+			if state and state.has_method("_apply_initial_audio_settings"):
+				state._apply_initial_audio_settings()
+				
+			print("Web audio context resumed via user interaction")
+			set_process_input(false) # Only need once
 
 func _style_all_buttons():
 	# Find all buttons and other controls in the scene

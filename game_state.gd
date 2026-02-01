@@ -98,10 +98,19 @@ const SKINS_DIR = "user://skins/"
 func _ready():
 	_ensure_audio_buses()
 	load_settings()
+	_apply_initial_audio_settings()
 	if not DirAccess.dir_exists_absolute(SAVES_DIR):
 		DirAccess.make_dir_absolute(SAVES_DIR)
 	if not DirAccess.dir_exists_absolute(SKINS_DIR):
 		DirAccess.make_dir_absolute(SKINS_DIR)
+
+func _apply_initial_audio_settings():
+	# Explicitly call setters to ensure AudioServer reflects current values
+	# especially if load_settings didn't find a config file
+	master_volume = master_volume
+	blocks_volume = blocks_volume
+	damage_volume = damage_volume
+	pickup_volume = pickup_volume
 
 func _ensure_audio_buses():
 	for bus_name in ["Blocks", "Damage", "Pickup"]:

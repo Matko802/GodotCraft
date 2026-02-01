@@ -278,39 +278,52 @@ func spawn_break_particles(pos: Vector3, type: int):
 		debris.global_position = pos + Vector3(0.5, 0.5, 0.5) + Vector3(randf()-0.5, randf()-0.5, randf()-0.5) * 0.3
 		debris.velocity = Vector3(randf() - 0.5, randf() * 1.5 + 1.0, randf() - 0.5) * 2.5
 
+var _sound_cache = {}
+
 func play_break_sound(pos: Vector3, type: int):
 	var category = TYPE_TO_SOUND.get(type, "stone")
 	var sound_paths = BLOCK_SOUNDS.get(category, BLOCK_SOUNDS["stone"])
 	var sound_path = sound_paths[randi() % sound_paths.size()]
 	
+	var stream = _get_sound(sound_path)
+	if not stream: return
+	
 	var audio = AudioStreamPlayer3D.new()
-	audio.stream = load(sound_path)
+	audio.stream = stream
 	audio.bus = "Blocks"
-	# Minecraft-like attenuation: very audible up to unit_size, then fades
 	audio.unit_size = 15.0 
 	audio.max_distance = 64.0
-	audio.attenuation_filter_cutoff_hz = 20000.0 # No muffling
+	audio.attenuation_filter_cutoff_hz = 20000.0
 	add_child(audio)
-	# Center of the block - must set after add_child for global_position to work
 	audio.global_position = pos + Vector3(0.5, 0.5, 0.5)
 	audio.play()
 	audio.finished.connect(audio.queue_free)
 
+func _get_sound(path: String) -> AudioStream:
+	if _sound_cache.has(path):
+		return _sound_cache[path]
+	
+	if ResourceLoader.exists(path):
+		var s = load(path)
+		_sound_cache[path] = s
+		return s
+	return null
+
 func play_place_sound(pos: Vector3, type: int):
-	# Usually placement sounds are the same as break/hit sounds in these games
 	var category = TYPE_TO_SOUND.get(type, "stone")
-	# We use "block_breaking" sounds for placement as they are the standard "thud"
 	var sound_paths = BLOCK_SOUNDS.get(category, BLOCK_SOUNDS["stone"])
 	var sound_path = sound_paths[randi() % sound_paths.size()]
 	
+	var stream = _get_sound(sound_path)
+	if not stream: return
+	
 	var audio = AudioStreamPlayer3D.new()
-	audio.stream = load(sound_path)
+	audio.stream = stream
 	audio.bus = "Blocks"
 	audio.unit_size = 12.0
 	audio.max_distance = 48.0
-	audio.pitch_scale = randf_range(0.8, 1.2) # Vary pitch for placement
+	audio.pitch_scale = randf_range(0.8, 1.2)
 	add_child(audio)
-	# Center of the block
 	audio.global_position = pos + Vector3(0.5, 0.5, 0.5)
 	audio.play()
 	audio.finished.connect(audio.queue_free)

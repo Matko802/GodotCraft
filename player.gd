@@ -91,12 +91,29 @@ const FALL_BIG_SOUNDS = [
 	"res://textures/Sounds/damage/fallbig2.ogg"
 ]
 
+var _sound_cache = {}
+
+func _get_sound(path: String) -> AudioStream:
+	if _sound_cache.has(path):
+		return _sound_cache[path]
+	if ResourceLoader.exists(path):
+		var s = load(path)
+		_sound_cache[path] = s
+		return s
+	return null
+
 func _play_fall_sound(dist: float):
-	var audio = AudioStreamPlayer.new()
+	var sound_path = ""
 	if dist > 7.0:
-		audio.stream = load(FALL_BIG_SOUNDS[randi() % FALL_BIG_SOUNDS.size()])
+		sound_path = FALL_BIG_SOUNDS[randi() % FALL_BIG_SOUNDS.size()]
 	else:
-		audio.stream = load(FALL_SMALL_SOUND)
+		sound_path = FALL_SMALL_SOUND
+	
+	var stream = _get_sound(sound_path)
+	if not stream: return
+
+	var audio = AudioStreamPlayer.new()
+	audio.stream = stream
 	audio.bus = "Damage"
 	add_child(audio)
 	audio.play()
@@ -104,8 +121,11 @@ func _play_fall_sound(dist: float):
 
 func _play_damage_sound():
 	var sound_path = DAMAGE_SOUNDS[randi() % DAMAGE_SOUNDS.size()]
+	var stream = _get_sound(sound_path)
+	if not stream: return
+
 	var audio = AudioStreamPlayer.new()
-	audio.stream = load(sound_path)
+	audio.stream = stream
 	audio.bus = "Damage"
 	add_child(audio)
 	audio.play()
