@@ -91,6 +91,8 @@ var _current_stage = LoadingStage.ASSETS
 var _assets_to_load = []
 var _total_assets = 0
 var _loaded_assets = 0
+var _stuck_log_timer = 0.0
+var _assets_loading_timer = 0.0
 
 var last_player_chunk = Vector2i(999, 999)
 var chunks_data_to_generate = [] 
@@ -862,22 +864,41 @@ func _process(delta):
 			var all_done = true
 			if not OS.has_feature("web"):
 				var loaded_count = 0
+				var still_loading = []
 				for path in _assets_to_load:
 					var status = ResourceLoader.load_threaded_get_status(path)
 					if status == ResourceLoader.THREAD_LOAD_LOADED:
 						# Actually pull it into memory
 						var _res = ResourceLoader.load_threaded_get(path)
 						loaded_count += 1
-					elif status == ResourceLoader.THREAD_LOAD_FAILED:
-						print("ERROR: Failed to preload asset: ", path)
+					elif status == ResourceLoader.THREAD_LOAD_FAILED or status == ResourceLoader.THREAD_LOAD_INVALID_RESOURCE:
+						print("ERROR: Failed to preload asset: ", path, " (Status: ", status, ")")
 						loaded_count += 1 # Count it as "handled" even if failed
 					else:
+						# Still in progress
 						all_done = false
+						still_loading.append(path)
 				_loaded_assets = loaded_count
+				
+				if not all_done:
+					_stuck_log_timer += delta
+					_assets_loading_timer += delta
+					if _stuck_log_timer >= 2.0:
+						_stuck_log_timer = 0.0
+						print("STUCK ASSETS (", still_loading.size(), "): ", still_loading.slice(0, 5))
+					
+					# Force proceed after 10 seconds of being stuck
+					if _assets_loading_timer >= 10.0:
+						print("WARNING: Asset loading timed out! Proceeding anyway...")
+						all_done = true
 			else:
 				# On web, _load_assets_web handles incrementing _loaded_assets
 				if _loaded_assets < _total_assets:
 					all_done = false
+					_assets_loading_timer += delta
+					if _assets_loading_timer >= 10.0:
+						print("WARNING: Web Asset loading timed out! Proceeding anyway...")
+						all_done = true
 			
 			if all_done:
 				print("All assets preloaded successfully (including failures).")
