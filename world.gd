@@ -421,12 +421,20 @@ func _ready():
 	
 	if OS.has_feature("web"):
 		# Try to resume audio context in World too
-		var mm = get_node_or_null("/root/MainMenu")
-		if mm and mm.has_method("_resume_web_audio"):
-			mm._resume_web_audio()
+		state = get_node_or_null("/root/GameState")
+		if state and state.has_method("resume_web_audio"):
+			state.resume_web_audio()
 		
 		# Play a test sound to confirm audio is working
 		var test_stream = _get_sound("res://textures/Sounds/random/pop.ogg")
+		if test_stream:
+			var audio = AudioStreamPlayer.new()
+			audio.stream = test_stream
+			audio.bus = "Master"
+			add_child(audio)
+			audio.play()
+			audio.finished.connect(audio.queue_free)
+			print("[GodotCraft] Triggered start test sound.")
 		if test_stream:
 			var audio = AudioStreamPlayer.new()
 			audio.stream = test_stream

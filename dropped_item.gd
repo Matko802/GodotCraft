@@ -116,8 +116,22 @@ func _process(delta):
 			resting = false
 
 	if not resting or being_picked_up:
+		var in_water = false
+		if world:
+			var current_block_pos = Vector3i(floor(global_position.x), floor(global_position.y), floor(global_position.z))
+			var block_type = world.get_block(current_block_pos)
+			if block_type == 7 or block_type == 8: # Water or Water Flow
+				in_water = true
+
 		if not resting:
-			velocity.y -= gravity * delta
+			if in_water:
+				# Buoyancy: items float up in water
+				velocity.y = move_toward(velocity.y, 1.5, delta * 15.0)
+				# Horizontal drag in water
+				velocity.x = move_toward(velocity.x, 0, delta * 2.0)
+				velocity.z = move_toward(velocity.z, 0, delta * 2.0)
+			else:
+				velocity.y -= gravity * delta
 		else:
 			# Slight upward force to help it slide over small bumps while being pulled
 			velocity.y = move_toward(velocity.y, 0, delta * 10.0)

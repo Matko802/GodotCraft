@@ -304,52 +304,9 @@ func _on_back_to_main_pressed():
 	settings_screen.visible = false
 
 func _resume_web_audio():
-	if not OS.has_feature("web"): return
-	
-	print("[GodotCraft] Attempting to resume Web audio...")
-	# Godot 4 Web audio resume logic
-	AudioServer.set_bus_mute(0, false)
-	
-	# Explicitly resume via JavaScript
-	if JavaScriptBridge:
-		JavaScriptBridge.eval("""
-			(function() {
-				var resume = function() {
-					var context = window.AudioContext || window.webkitAudioContext;
-					if (context) {
-						// Resume all potential contexts
-						if (typeof Module !== 'undefined' && Module.audioContext) {
-							Module.audioContext.resume();
-						}
-						
-						// Create and resume a dummy context to poke the system
-						var dummy = new (window.AudioContext || window.webkitAudioContext)();
-						dummy.resume();
-					}
-					console.log('[GodotCraft JS] Audio resume attempt triggered');
-				};
-				resume();
-				// Persistent listeners to ensure resume on any interaction
-				window.addEventListener('mousedown', resume, { once: false });
-				window.addEventListener('keydown', resume, { once: false });
-				window.addEventListener('touchstart', resume, { once: false });
-			})();
-		""")
-	
-	# Force unmute and volume reset for all standard buses
 	var state = get_node_or_null("/root/GameState")
-	for bus_name in ["Master", "Blocks", "Damage", "Pickup"]:
-		var idx = AudioServer.get_bus_index(bus_name)
-		if idx != -1:
-			AudioServer.set_bus_mute(idx, false)
-			var vol = 1.0
-			if state:
-				match bus_name:
-					"Master": vol = state.master_volume
-					"Blocks": vol = state.blocks_volume
-					"Damage": vol = state.damage_volume
-					"Pickup": vol = state.pickup_volume
-			AudioServer.set_bus_volume_db(idx, linear_to_db(vol))
+	if state and state.has_method("resume_web_audio"):
+		state.resume_web_audio()
 
 func _on_create_pressed():
 	var world_name = world_name_input.text.strip_edges()
