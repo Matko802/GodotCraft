@@ -15,7 +15,7 @@ compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 [application]
 
 config/name="GodotCraft"
-config/version="0.0.8.0"
+config/version="0.0.5A"
 run/main_scene="res://main_menu.tscn"
 config/features=PackedStringArray("4.6", "GL Compatibility")
 config/icon="res://icon.svg"
@@ -53,3 +53,4 @@ textures/vram_compression/import_s3tc_bptc=true
 textures/vram_compression/import_etc2_astc=true
 shadows/directional_shadow/size=4096.0
 shadows/directional_shadow/soft_shadow_filter_quality=3.0
+limits/cluster_builder/max_lights=512.0

@@ -162,14 +162,14 @@ func _on_input_gui_input(event):
 	if event is InputEventKey and event.pressed:
 		if event.keycode == KEY_TAB:
 			if suggestions_panel.visible and suggestions_list.get_child_count() > 0:
-				selected_suggestion_index = (selected_suggestion_index + 1) % suggestions_list.get_child_count()
-				_update_suggestion_visuals()
-				get_viewport().set_input_as_handled()
-		elif event.keycode == KEY_SPACE:
-			if suggestions_panel.visible and suggestions_list.get_child_count() > 0:
-				var idx = selected_suggestion_index if selected_suggestion_index != -1 else 0
-				var btn = suggestions_list.get_child(idx)
-				_apply_suggestion(btn.text)
+				if selected_suggestion_index == -1:
+					# First tab: highlight the first suggestion
+					selected_suggestion_index = 0
+					_update_suggestion_visuals()
+				else:
+					# Second tab (or tab while highlighted): apply it
+					var btn = suggestions_list.get_child(selected_suggestion_index)
+					_apply_suggestion(btn.text)
 				get_viewport().set_input_as_handled()
 		elif event.keycode == KEY_UP:
 			if history.size() > 0:

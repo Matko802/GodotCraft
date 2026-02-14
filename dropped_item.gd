@@ -1,15 +1,17 @@
-extends Node3D
+extends Area3D
 
 var type: int
 var count: int = 1
 var velocity = Vector3.ZERO
-var gravity = 20.0
+var item_gravity = 20.0
 var lifetime = 300.0 # 5 minutes
 var pickup_delay = 0.1 # Reduced delay for immediate collection
 var resting: bool = false
 var time_passed: float = 0.0
 var being_picked_up: bool = false
 var target_player: Node3D = null
+var pickup_animation_time: float = 0.0
+const PICKUP_ANIMATION_DURATION: float = 0.3
 
 var block_textures = {
 	0: preload("res://textures/stone.png"),
@@ -25,6 +27,17 @@ var block_textures = {
 
 func _ready():
 	add_to_group("dropped_items")
+	
+	# Setup collision for item pickup
+	collision_layer = 0  # Not on any physics layer
+	collision_mask = 0   # Don't collide with physics
+	
+	# Create collision shape
+	var collision_shape = CollisionShape3D.new()
+	var sphere = SphereShape3D.new()
+	sphere.radius = 0.3
+	collision_shape.shape = sphere
+	add_child(collision_shape)
 	
 	if type == 9: # Torch
 		var world = get_tree().get_first_node_in_group("world")
@@ -95,6 +108,36 @@ func _ready():
 	rotation_degrees = Vector3(0, randf() * 360, 0)
 
 func _process(delta):
+	# Handle pickup animation
+	if being_picked_up:
+		pickup_animation_time += delta
+		var progress = pickup_animation_time / PICKUP_ANIMATION_DURATION
+		
+		if progress >= 1.0:
+			queue_free()
+			return
+		
+		# Shrink and fade out
+		var scale_factor = 1.0 - progress
+		mesh_instance.scale = Vector3.ONE * scale_factor
+		
+		# Fade out by adjusting material transparency
+		if mesh_instance.material_override:
+			var mat = mesh_instance.material_override.duplicate() as Material
+			if mat is StandardMaterial3D:
+				mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+				var col = mat.albedo_color
+				col.a = 1.0 - progress
+				mat.albedo_color = col
+			mesh_instance.material_override = mat
+		
+		# Move towards player slightly
+		if target_player and is_instance_valid(target_player):
+			var direction = (target_player.global_position - global_position).normalized()
+			global_position += direction * 8.0 * delta
+		
+		return
+	
 	lifetime -= delta
 	if lifetime <= 0:
 		queue_free()
@@ -131,7 +174,7 @@ func _process(delta):
 				velocity.x = move_toward(velocity.x, 0, delta * 2.0)
 				velocity.z = move_toward(velocity.z, 0, delta * 2.0)
 			else:
-				velocity.y -= gravity * delta
+				velocity.y -= item_gravity * delta
 		else:
 			# Slight upward force to help it slide over small bumps while being pulled
 			velocity.y = move_toward(velocity.y, 0, delta * 10.0)
@@ -185,45 +228,30 @@ func _process(delta):
 	mesh_instance.position.y = bob
 	mesh_instance.rotate_y(delta * 2.0)
 	
-	# Check for player pickup
-	if pickup_delay <= 0:
-		var players = get_tree().get_nodes_in_group("player")
-		for player in players:
-			# Only attract if player has space
-			if not player.inventory.can_add_item(type, count):
-				continue
-				
-			var target_pos = player.global_position + Vector3(0, 0.5, 0)
-			var dist = global_position.distance_to(target_pos)
-			
-			if dist < 0.3: # Collection threshold
+	# Check for pickup by proximity to player
+	var player = get_tree().get_first_node_in_group("player")
+	if player and pickup_delay <= 0 and not being_picked_up:
+		var distance = global_position.distance_to(player.global_position)
+		if distance < 1.5:  # Pickup radius of 1.5 units
+			# Only collect if player has space
+			if player.inventory.can_add_item(type, count):
 				var added = player.inventory.add_item(type, count)
 				if added > 0:
 					_play_pickup_sound()
 					count -= added
-					if count <= 0:
-						queue_free()
-						return
-			elif dist < 3.5: # Attraction range
-				being_picked_up = true
-				target_player = player
-				
-				# Magnetic pull
-				var dir = (target_pos - global_position).normalized()
-				var pull_speed = 12.0
-				# Get faster as it gets closer to snap into the 0.3m zone
-				if dist < 1.0:
-					pull_speed = 18.0
 					
-				velocity = velocity.lerp(dir * pull_speed, delta * 10.0)
-				
-				# Shrink animation when close
-				var s = clamp(dist * 2.0, 0.1, 1.0)
-				mesh_instance.scale = Vector3.ONE * s
-				return # Only attract to one player
-		
-		# If no player is nearby, we are no longer being picked up
-		being_picked_up = false
+					# Start pickup animation
+					being_picked_up = true
+					target_player = player
+					pickup_animation_time = 0.0
+					
+					# Disable physics during pickup animation
+					resting = true
+					velocity = Vector3.ZERO
+					
+					if count <= 0:
+						# Item fully picked up, will be freed during animation
+						return
 
 func _play_pickup_sound():
 	var sound_path = "res://textures/Sounds/random/pop.ogg"

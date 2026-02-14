@@ -71,7 +71,7 @@ transform = Transform3D(0.9, 0, 0, 0, 0.9, 0, 0, 0, 0.9, 0, -0.9912943, 0)
 [node name="TPHeldItemRoot" type="Node3D" parent="." unique_id=617698788]
 
 [node name="TPHeldItemMesh" type="MeshInstance3D" parent="TPHeldItemRoot" unique_id=2905852]
-transform = Transform3D(0.39999998, 0, 0, 0, 0.39999998, 0, 0, 0, 0.39999998, 0.321, -0.271, 0.023901299)
+transform = Transform3D(0.39999998, 0, 0, 0, 0.39999998, 0, 0, 0, 0.39999998, 0.321, -0.271, -0.16644864)
 
 [node name="SpringArm3D" type="SpringArm3D" parent="." unique_id=841691994]
 spring_length = 4.0
@@ -137,3 +137,13 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.65, 0)
 [node name="RayCast3D" type="RayCast3D" parent="RayCastPivot" unique_id=1056537454]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.08973634, 0)
 target_position = Vector3(0, 0, -5)
+
+[node name="DeleteConfirmDialog" type="ConfirmationDialog" parent="." unique_id=365840715]
+
+[node name="LeavingOverlay" type="ColorRect" parent="." unique_id=1329777780]
+
+[node name="CenterContainer" type="CenterContainer" parent="LeavingOverlay" unique_id=1108510253]
+layout_mode = 0
+
+[node name="Label" type="Label" parent="LeavingOverlay/CenterContainer" unique_id=383961005]
+layout_mode = 2

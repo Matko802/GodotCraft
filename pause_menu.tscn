@@ -253,3 +253,18 @@ text = "Back"
 
 [node name="HSeparator2" type="HSeparator" parent="CenterContainer/MenuPanel/MenuMargin/VBoxContainer" unique_id=246394836]
 layout_mode = 2
+
+[node name="LeavingOverlay" type="ColorRect" parent="." unique_id=2105695701]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0, 0, 0, 0.8)
+
+[node name="CenterContainer" type="CenterContainer" parent="LeavingOverlay" unique_id=92599957]
+layout_mode = 0
+offset_right = 1.0
+offset_bottom = 23.0
+
+[node name="Label" type="Label" parent="LeavingOverlay/CenterContainer" unique_id=75383173]
+layout_mode = 2
+text = "Leaving World..."

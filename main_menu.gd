@@ -19,6 +19,7 @@ extends Control
 @onready var thumbnail_ui = find_child("ThumbnailUI", true) as TextureRect
 @onready var info_label = find_child("WorldInfoLabel", true) as Label
 @onready var play_back_button = find_child("PlayBackButton", true) as Button
+@onready var tabs = find_child("TabContainer", true) as TabContainer
 
 # Settings Screen Elements
 @onready var render_distance_slider = find_child("RenderDistanceSliderUI", true) as HSlider
@@ -43,11 +44,25 @@ extends Control
 @onready var browse_texture_button = find_child("BrowseTextureButtonUI", true) as Button
 @onready var username_input = find_child("UsernameInputUI", true) as LineEdit
 @onready var settings_back_button = find_child("SettingsBackButtonUI", true) as Button
+@onready var delete_confirm = $DeleteConfirmDialog
 
 var selected_save_index = -1
+var quit_confirm: ConfirmationDialog
 
 func _ready():
 	randomize()
+	
+	# Create quit confirmation dialog
+	quit_confirm = ConfirmationDialog.new()
+	quit_confirm.title = "Quit Game?"
+	quit_confirm.dialog_text = "Are you sure you want to quit?"
+	quit_confirm.confirmed.connect(_on_quit_confirmed)
+	add_child(quit_confirm)
+	
+	if delete_confirm:
+		delete_confirm.title = "Delete World?"
+		delete_confirm.dialog_text = "Are you sure you want to delete this world? This cannot be undone."
+		delete_confirm.confirmed.connect(_on_delete_confirmed)
 	
 	# Resume AudioServer on first input (Web requirement)
 	if OS.has_feature("web"):
@@ -131,10 +146,10 @@ func _ready():
 func _update_version_label():
 	var version = ProjectSettings.get_setting("application/config/version", "0.0.0.0")
 	var engine_info = Engine.get_version_info()
-	var engine_str = "Godot %d.%d.%d" % [engine_info.major, engine_info.minor, engine_info.patch]
+	var engine_str = "%d.%d.%d" % [engine_info.major, engine_info.minor, engine_info.patch]
 	
 	if has_node("VersionLabel"):
-		$VersionLabel.text = "build %s (%s)" % [version, engine_str]
+		$VersionLabel.text = "%s (Godot %s)" % [version, engine_str]
 
 func _input(event):
 	if OS.has_feature("web"):
@@ -282,11 +297,23 @@ func refresh_save_list():
 			save_list.add_item(text)
 			save_list.set_item_metadata(save_list.get_item_count() - 1, s_name)
 
+func _update_play_screen_tab():
+	var state = get_node_or_null("/root/GameState")
+	if state:
+		var saves = state.get_save_list()
+		if saves.is_empty():
+			# No worlds exist, show Create World tab
+			tabs.current_tab = 0
+		else:
+			# Worlds exist, show Load World tab
+			tabs.current_tab = 1
+
 func _on_play_pressed():
 	_resume_web_audio()
 	main_screen.visible = false
 	play_screen.visible = true
 	refresh_save_list()
+	_update_play_screen_tab()
 
 func _on_settings_pressed():
 	_resume_web_audio()
@@ -295,6 +322,10 @@ func _on_settings_pressed():
 
 func _on_quit_pressed():
 	_resume_web_audio()
+	if quit_confirm:
+		quit_confirm.popup_centered()
+
+func _on_quit_confirmed():
 	get_tree().quit()
 
 func _on_back_to_main_pressed():
@@ -378,7 +409,9 @@ func _on_load_pressed():
 
 func _on_delete_pressed():
 	if selected_save_index == -1: return
-	
+	delete_confirm.popup_centered()
+
+func _on_delete_confirmed():
 	var save_name = save_list.get_item_metadata(selected_save_index)
 	var state = get_node_or_null("/root/GameState")
 	if state:
@@ -398,7 +431,6 @@ func _on_fov_changed(value):
 	if state:
 		state.fov = float(value)
 		state.save_settings()
-		state.settings_changed.emit()
 
 func _on_fullscreen_toggled(toggled_on):
 	var state = get_node_or_null("/root/GameState")

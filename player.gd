@@ -17,6 +17,7 @@ const MOUSE_SENSITIVITY = 0.002
 @onready var crosshair = $HUD/CrosshairContainer
 @onready var pause_menu = $PauseLayer/PauseMenu
 @onready var player_model = $PlayerModel
+var shadow_only_model: Node3D = null
 
 @onready var view_model_camera = $ViewModelLayer/ViewModelContainer/SubViewport/ViewModelCamera
 @onready var view_model_arm = $ViewModelLayer/ViewModelContainer/SubViewport/ViewModelCamera/ViewModelArm
@@ -50,8 +51,10 @@ var swing_progress = 0.0
 const SWING_SPEED = 4.0
 
 var sneak_progress = 0.0
+var model_sneak_progress = 0.0  # For instant model animation switching
 const SNEAK_CAM_OFFSET = -0.25
-const SNEAK_TRANSITION_SPEED = 12.0
+const SNEAK_TRANSITION_SPEED = 6.0  # Camera transition speed (smooth)
+const SNEAK_MODEL_TRANSITION_SPEED = 999.0  # Model animation instant
 
 var _hand_light_ref: OmniLight3D = null
 var _viewmodel_light_ref: OmniLight3D = null
@@ -186,7 +189,7 @@ const MINING_TIMES = {
 	1: 0.5, # DIRT
 	2: 0.6, # GRASS
 	3: 0.5, # SAND
-	4: -1.0, # BEDROCK
+	4: 5.0, # BEDROCK
 	5: 1.5, # WOOD
 	6: 0.1, # LEAVES
 	9: 0.0, # TORCH
@@ -225,6 +228,7 @@ func _ready():
 	var state = get_node_or_null("/root/GameState")
 	if state:
 		state.settings_changed.connect(_on_settings_changed)
+		current_camera_mode = state.last_camera_mode as CameraMode
 		_on_settings_changed()
 	
 	if inventory_ui:
@@ -265,6 +269,24 @@ func _setup_input_map():
 			InputMap.action_add_event(action, ev)
 
 var camera_pitch = 0.0
+
+func _create_shadow_only_duplicate():
+	# Create an invisible duplicate that only casts shadows for first person
+	if shadow_only_model:
+		shadow_only_model.queue_free()
+	
+	shadow_only_model = player_model.duplicate(true)
+	shadow_only_model.name = "ShadowOnlyModel"
+	add_child(shadow_only_model)
+	
+	# Hide from camera view but keep shadows
+	for child in shadow_only_model.find_children("*", "VisualInstance3D", true):
+		child.layers = 0  # No camera sees this
+		if child is GeometryInstance3D:
+			child.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+	
+	if shadow_only_model is VisualInstance3D:
+		shadow_only_model.layers = 0
 
 func _setup_player_model():
 	var state = get_node_or_null("/root/GameState")
@@ -374,12 +396,13 @@ func _setup_player_model():
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
 	mat.alpha_scissor_threshold = 0.5
 	
-	# Ensure every visual part of the player model is on Layer 3
-	# This is critical so the held torch light (cull mask 1) can ignore it.
+	# Ensure every visual part of the player model is on Layer 4 (Player)
+	# Layer 4 = Player model visuals (can be hidden but still cast shadows)
 	if player_model is VisualInstance3D:
 		player_model.layers = 4
 	for child in player_model.find_children("*", "VisualInstance3D", true):
-		child.layers = 4 # Layer 3
+		child.layers = 4 # Layer 4 (Player)
+		child.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON # Always cast shadows
 		if child is MeshInstance3D:
 			child.material_override = mat
 	
@@ -416,11 +439,30 @@ func _on_settings_changed():
 	if state:
 		camera.fov = state.fov
 		_update_light_shadows()
+		# Don't call _setup_player_model() or _update_camera_mode() here
+		# It causes unwanted camera shifts when adjusting settings in pause menu
+		# Only reload the model if the model type actually changed
+		_validate_player_model()
+
+func _validate_player_model():
+	# Only reload the model if the type/slim setting actually changed
+	var state = get_node_or_null("/root/GameState")
+	if not state: return
+	
+	var is_slim = state.is_slim
+	var is_matko = state.username == "Matko802"
+	var expected_path = "res://models/player/slim/model.gltf" if is_slim else "res://models/player/wide/model.gltf"
+	if is_matko:
+		expected_path = "res://models/player/Matko880 exclusive model/Matko802.gltf"
+	
+	var current_path = player_model.scene_file_path
+	if current_path != expected_path:
+		# Model type changed, reload it
 		_setup_player_model()
 
 func _update_light_shadows():
 	if not _hand_light_ref: return
-	_hand_light_ref.shadow_enabled = false # Held torch shadows are disabled as requested
+	_hand_light_ref.shadow_enabled = false
 
 func _setup_selection_box():
 	selection_box = MeshInstance3D.new()
@@ -724,9 +766,11 @@ func _process(delta):
 		view_model_camera.fov = 85 # Increased FOV to make the hand look smaller and further away
 
 func _update_sneak(delta):
-	var is_sneaking = Input.is_action_pressed("sneak") and not is_flying
+	# Disable sneaking when inventory is open
+	var is_sneaking = Input.is_action_pressed("sneak") and not is_flying and not (inventory_ui and inventory_ui.main_inventory_panel.visible)
 	var target_sneak = 1.0 if is_sneaking else 0.0
 	sneak_progress = move_toward(sneak_progress, target_sneak, delta * SNEAK_TRANSITION_SPEED)
+	model_sneak_progress = move_toward(model_sneak_progress, target_sneak, delta * SNEAK_MODEL_TRANSITION_SPEED)
 	
 	# Adjust spring arm height smoothly instead of camera
 	var base_spring_y = 0.65
@@ -753,60 +797,73 @@ func _update_mining(delta):
 	var state = get_node_or_null("/root/GameState")
 	var is_creative = state and state.gamemode == state.GameMode.CREATIVE
 	
-	if Input.is_action_pressed("attack") and raycast.is_colliding() and not is_creative:
-		var hit_point = raycast.get_collision_point()
-		var hit_normal = raycast.get_collision_normal()
+	# Disable mining when inventory or chat is open
+	if (inventory_ui and inventory_ui.main_inventory_panel.visible) or (chat_ui and chat_ui.is_chat_active()):
+		_reset_mining()
+		return
+	
+	if Input.is_action_pressed("attack"):
+		if not is_swinging:
+			swing()
 		
-		var abs_normal = hit_normal.abs()
-		var break_dir = Vector3i.ZERO
-		if abs_normal.x > abs_normal.y and abs_normal.x > abs_normal.z:
-			break_dir.x = 1 if hit_normal.x > 0 else -1
-		elif abs_normal.y > abs_normal.x and abs_normal.y > abs_normal.z:
-			break_dir.y = 1 if hit_normal.y > 0 else -1
-		else:
-			break_dir.z = 1 if hit_normal.z > 0 else -1
+		if raycast.is_colliding() and not is_creative:
+			var hit_point = raycast.get_collision_point()
+			var hit_normal = raycast.get_collision_normal()
 			
-		var block_center = hit_point - Vector3(break_dir) * 0.5
-		var block_pos = Vector3i(floor(block_center.x), floor(block_center.y), floor(block_center.z))
-		var type = world.get_block(block_pos)
-		
-		# Type 7 and 8 are water
-		if type >= 0 and type != 7 and type != 8:
-			var duration = MINING_TIMES.get(type, 1.5)
+			var abs_normal = hit_normal.abs()
+			var break_dir = Vector3i.ZERO
+			if abs_normal.x > abs_normal.y and abs_normal.x > abs_normal.z:
+				break_dir.x = 1 if hit_normal.x > 0 else -1
+			elif abs_normal.y > abs_normal.x and abs_normal.y > abs_normal.z:
+				break_dir.y = 1 if hit_normal.y > 0 else -1
+			else:
+				break_dir.z = 1 if hit_normal.z > 0 else -1
+				
+			var block_center = hit_point - Vector3(break_dir) * 0.5
+			var block_pos = Vector3i(floor(block_center.x), floor(block_center.y), floor(block_center.z))
+			var type = world.get_block(block_pos)
 			
-			if duration < 0: # Unbreakable
+			if type >= 0 and type != 7 and type != 8:
+				var duration = MINING_TIMES.get(type, 1.5)
+				
+				if duration < 0:
+					_reset_mining()
+					return
+					
+				if block_pos != current_mining_pos:
+					current_mining_pos = block_pos
+					mining_progress = 0.0
+					mining_sound_timer = 0.0
+					
+				if duration == 0:
+					_finish_mining(block_pos, type)
+					return
+					
+				mining_progress += delta
+				mining_sound_timer -= delta
+				
+				if not is_swinging:
+					swing()
+				
+				if mining_sound_timer <= 0:
+					world.play_break_sound(Vector3(block_pos), type)
+					mining_sound_timer = 0.3
+				
+				# Visuals - Only show for non-bedrock
+				if type != 4:
+					breaking_mesh.global_position = Vector3(block_pos) + Vector3(0.5, 0.5, 0.5)
+					breaking_mesh.visible = true
+					
+					var stage = int((mining_progress / duration) * 10)
+					stage = clamp(stage, 0, 9)
+					breaking_mesh.material_override.albedo_texture = breaking_textures[stage]
+				else:
+					breaking_mesh.visible = false
+				
+				if mining_progress >= duration:
+					_finish_mining(block_pos, type)
+			else:
 				_reset_mining()
-				return
-				
-			if block_pos != current_mining_pos:
-				current_mining_pos = block_pos
-				mining_progress = 0.0
-				mining_sound_timer = 0.0
-				
-			if duration == 0: # Instant
-				_finish_mining(block_pos, type)
-				return
-				
-			mining_progress += delta
-			mining_sound_timer -= delta
-			
-			if not is_swinging:
-				swing()
-			
-			if mining_sound_timer <= 0:
-				world.play_break_sound(Vector3(block_pos), type)
-				mining_sound_timer = 0.3 # Minecraft-like hit frequency
-			
-			# Visuals
-			breaking_mesh.global_position = Vector3(block_pos) + Vector3(0.5, 0.5, 0.5)
-			breaking_mesh.visible = true
-			
-			var stage = int((mining_progress / duration) * 10)
-			stage = clamp(stage, 0, 9)
-			breaking_mesh.material_override.albedo_texture = breaking_textures[stage]
-			
-			if mining_progress >= duration:
-				_finish_mining(block_pos, type)
 		else:
 			_reset_mining()
 	else:
@@ -816,6 +873,10 @@ func _finish_mining(block_pos, type):
 	var state_gm = get_node_or_null("/root/GameState")
 	var is_creative_mode = state_gm and state_gm.gamemode == state_gm.GameMode.CREATIVE
 	
+	if type == 4 and not is_creative_mode:
+		_reset_mining()
+		return
+		
 	swing()
 	
 	var drop_type = type
@@ -895,6 +956,11 @@ func _animate_walk(delta):
 	var horizontal_speed = Vector2(velocity.x, velocity.z).length()
 	idle_time += delta
 	
+	# Disable arm swing animation when inventory is open
+	if inventory_ui and inventory_ui.main_inventory_panel.visible:
+		is_swinging = false
+		swing_progress = 0.0
+	
 	var item = inventory.hotbar[selected_slot]
 	var _is_holding = item != null
 	var is_sneaking = Input.is_action_pressed("sneak") and not is_flying
@@ -937,7 +1003,10 @@ func _animate_walk(delta):
 		var in_air = not is_on_floor() and not is_flying
 		var is_moving = horizontal_speed > 0.1
 		
-		if is_sneaking:
+		# Use model_sneak_progress for instant animation switching (instead of sneak_progress for camera)
+		var is_model_sneaking = model_sneak_progress > 0.5
+		
+		if is_model_sneaking:
 			if is_moving:
 				target_name = "sneak_walk"
 				if _find_best_anim("sneak_walk") == "":
@@ -1038,6 +1107,15 @@ func _unhandled_input(event):
 			pause_menu.open()
 		return
 	
+	# Disable all interactions when inventory is open (but allow E to close it)
+	if inventory_ui and inventory_ui.main_inventory_panel.visible:
+		# Allow E key to close inventory
+		if event is InputEventKey and event.pressed and event.keycode == KEY_E:
+			inventory_ui.toggle_inventory()
+			get_viewport().set_input_as_handled()
+			return
+		return
+	
 	if chat_ui and chat_ui.is_chat_active():
 		return
 
@@ -1050,6 +1128,10 @@ func _unhandled_input(event):
 	if event is InputEventKey and event.pressed and event.keycode == KEY_F5:
 		current_camera_mode = ((current_camera_mode + 1) % 3) as CameraMode
 		_update_camera_mode()
+		var state = get_node_or_null("/root/GameState")
+		if state:
+			state.last_camera_mode = current_camera_mode as int
+			state.save_settings()
 		get_viewport().set_input_as_handled()
 		return
 	
@@ -1369,6 +1451,11 @@ func _update_camera_mode():
 	
 	_update_held_item_mesh()
 	_apply_rotations()
+	_ensure_shadows_visible()
+	
+	# Create shadow-only duplicate if needed
+	if not shadow_only_model:
+		_create_shadow_only_duplicate()
 
 func _set_model_visible(v: bool):
 	var nodes_to_check = player_model.find_children("*", "VisualInstance3D", true)
@@ -1384,18 +1471,48 @@ func _set_model_visible(v: bool):
 			continue
 			
 		if not v:
-			# In first person, hide the mesh from the camera but keep it for shadows
+			# In first person, hide main model completely
+			child.visible = false
 			if child is GeometryInstance3D:
-				child.visible = true
-				child.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
-			else:
-				child.visible = false
+				child.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			# Enable shadow-only duplicate instead
+			if shadow_only_model:
+				shadow_only_model.visible = true
 		else:
+			# In third person, show main model normally
 			child.visible = true
+			child.layers = 4
 			if child is GeometryInstance3D:
 				child.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+			if child is MeshInstance3D:
+				child.material_override = null
+			# Hide shadow-only duplicate
+			if shadow_only_model:
+				shadow_only_model.visible = false
+
+func _ensure_shadows_visible():
+	# Force update shadow casting for all model parts
+	var nodes_to_check = player_model.find_children("*", "VisualInstance3D", true)
+	if player_model is VisualInstance3D:
+		nodes_to_check.append(player_model)
+	
+	for child in nodes_to_check:
+		if camera.is_ancestor_of(child):
+			continue
+		if child is GeometryInstance3D:
+			# Always cast shadows regardless of visibility
+			child.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 
 func _physics_process(delta):
+	# Disable movement if inventory is open
+	if inventory_ui and inventory_ui.main_inventory_panel.visible:
+		velocity.x = move_toward(velocity.x, 0, 60.0 * delta)
+		velocity.z = move_toward(velocity.z, 0, 60.0 * delta)
+		if not is_on_floor():
+			velocity.y -= gravity * delta
+		move_and_slide()
+		return
+	
 	if chat_ui and chat_ui.is_chat_active():
 		velocity.x = move_toward(velocity.x, 0, 60.0 * delta)
 		velocity.z = move_toward(velocity.z, 0, 60.0 * delta)

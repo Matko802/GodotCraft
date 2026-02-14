@@ -109,6 +109,7 @@ var mesh_throttle_timer = 0.0
 
 var spawn_pos = Vector3(8, 40, 8)
 var world_mutex = Mutex.new()
+var _world_being_freed = false
 
 # Time system (0 to 24000, 24000 ticks = 24 hours)
 # 0 = 06:00 (Sunrise), 6000 = 12:00 (Noon), 12000 = 18:00 (Sunset), 18000 = 00:00 (Midnight)
@@ -533,14 +534,9 @@ func _apply_settings():
 	_update_torch_lights()
 
 func _update_torch_lights():
-	var state = get_node_or_null("/root/GameState")
-	if not state: return
-	
 	for light in get_tree().get_nodes_in_group("torch_lights"):
 		if light is OmniLight3D:
-			# Skip the player's held torch light
-			if light.name == "HandLight": continue
-			_apply_shadow_settings_to_light(light, state.shadow_quality)
+			light.shadow_enabled = false
 
 func _apply_shadow_settings_to_light(light: OmniLight3D, quality: int):
 	light.shadow_enabled = quality > 0
@@ -648,6 +644,9 @@ func _update_sun_rotation():
 	# When sun is at 90 deg (Noon), light should point down (-90)
 	sun.rotation_degrees.x = -angle
 	sun.rotation_degrees.y = 180.0
+	
+	# Ensure sun can see and cast shadows from player layer (Layer 4)
+	sun.light_cull_mask = 4294967295  # All layers
 
 	# Calculate day/night intensity (0.0 to 1.0)
 	# Day peaks at 6000, Night peaks at 18000
@@ -703,89 +702,107 @@ func _update_sun_rotation():
 
 func _notification(what):
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:
+		_world_being_freed = true
 		if not is_loading:
-			# If we are in a world, try to save
+			# Quick save without waiting
 			var state = get_node_or_null("/root/GameState")
 			if state and state.current_save_name != "":
-				# Save without screenshot for faster closing
-				await save_game(true)
+				save_game(true)  # Don't await, just start it
+		
+		# Give a tiny moment then quit
+		await get_tree().process_frame
 		get_tree().quit()
+	elif what == NOTIFICATION_EXIT_TREE:
+		_world_being_freed = true
+		# Clear all pending generation tasks
+		chunks_data_to_generate.clear()
+		chunks_data_to_generate_set.clear()
+		chunks_to_generate.clear()
+		chunks_to_generate_set.clear()
 
 func save_game(data_only: bool = false):
 	var state = get_node_or_null("/root/GameState")
-	if state and state.current_save_name != "":
-		var img = null
-		if not data_only:
-			# Hide UI for screenshot
-			var hud = get_node_or_null("Player/HUD")
-			var pause_layer = get_node_or_null("Player/PauseLayer")
-			var player = get_tree().get_first_node_in_group("player")
-			var view_model = null
-			if player:
-				view_model = player.get_node_or_null("SpringArm3D/Camera3D/ViewModelArm")
-				
-			if hud: hud.visible = false
-			if pause_layer: pause_layer.visible = false
-			if view_model: view_model.visible = false
-			
-			# Wait for render frame to ensure UI is hidden in capture
-			await RenderingServer.frame_post_draw
-			
-			img = get_viewport().get_texture().get_image()
-			# Resize to small thumbnail to speed up save_png
-			img.resize(320, 180, Image.INTERPOLATE_LANCZOS)
-			
-			# Restore UI immediately so user doesn't see flicker
-			if hud: hud.visible = true
-			if pause_layer: pause_layer.visible = true
-			if view_model: view_model.visible = player.current_camera_mode == player.CameraMode.FIRST_PERSON
-
-		var inv_data = {"hotbar": [], "inventory": []}
-		if has_node("Player/Inventory"):
-			var inv = $Player/Inventory
-			inv_data["hotbar"] = inv.hotbar
-			inv_data["inventory"] = inv.inventory
-
-		var dropped_items_data = []
-		for item in get_tree().get_nodes_in_group("dropped_items"):
-			if is_instance_valid(item):
-				dropped_items_data.append({
-					"type": item.type,
-					"count": item.count,
-					"pos": item.global_position,
-					"vel": item.velocity
-				})
-
-		world_mutex.lock()
-		var data = {
-			"seed": world_seed,
-			"world_data": world_data.duplicate(),
-			"chunk_data_status": chunk_data_status.duplicate(),
-			"player_pos": $Player.global_position,
-			"player_rot": $Player.rotation,
-			"selected_slot": $Player.selected_slot if has_node("Player") else 0,
-			"inventory": inv_data,
-			"rules": state.rules.duplicate(),
-			"ops": state.ops.duplicate(),
-			"gamemode": state.gamemode,
-			"dropped_items": dropped_items_data,
-			"time": time
-		}
-		world_mutex.unlock()
+	if not state or state.current_save_name == "":
+		print("ERROR: No valid save name set")
+		return
+	
+	var save_name = state.current_save_name
+	
+	# ONLY lock the mutex for the minimum time needed - just grab the references
+	var world_data_copy = {}
+	var chunk_data_status_copy = {}
+	
+	world_mutex.lock()
+	# Copy ONLY the dictionary references, not the contents
+	for chunk_pos in world_data:
+		world_data_copy[chunk_pos] = world_data[chunk_pos]
+	chunk_data_status_copy = chunk_data_status.duplicate()
+	var time_copy = time
+	world_mutex.unlock()
+	
+	# Now gather inventory and dropped items (no mutex needed)
+	var inv_data = {"hotbar": [], "inventory": []}
+	if has_node("Player/Inventory"):
+		var inv = $Player/Inventory
+		inv_data["hotbar"] = inv.hotbar
+		inv_data["inventory"] = inv.inventory
+	
+	var dropped_items_data = []
+	for item in get_tree().get_nodes_in_group("dropped_items"):
+		if is_instance_valid(item):
+			dropped_items_data.append({
+				"type": item.type,
+				"count": item.count,
+				"pos": item.global_position,
+				"vel": item.velocity
+			})
+	
+	# Build data dict WITHOUT holding the lock
+	var data = {
+		"seed": world_seed,
+		"world_data": world_data_copy,
+		"chunk_data_status": chunk_data_status_copy,
+		"player_pos": $Player.global_position if has_node("Player") else spawn_pos,
+		"player_rot": $Player.rotation if has_node("Player") else Vector3.ZERO,
+		"selected_slot": $Player.selected_slot if has_node("Player") else 0,
+		"inventory": inv_data,
+		"rules": state.rules.duplicate(),
+		"ops": state.ops.duplicate(),
+		"gamemode": state.gamemode,
+		"dropped_items": dropped_items_data,
+		"time": time_copy
+	}
+	
+	# Save thumbnail (optional, don't block on it)
+	if not data_only:
+		var hud = get_node_or_null("Player/HUD")
+		var pause_layer = get_node_or_null("Player/PauseLayer")
+		var player = get_tree().get_first_node_in_group("player")
+		var view_model = null
+		if player:
+			view_model = player.get_node_or_null("SpringArm3D/Camera3D/ViewModelArm")
 		
-		var save_name = state.current_save_name
+		if hud: hud.visible = false
+		if pause_layer: pause_layer.visible = false
+		if view_model: view_model.visible = false
+		
+		await RenderingServer.frame_post_draw
+		
+		var img = get_viewport().get_texture().get_image()
+		img.resize(320, 180, Image.INTERPOLATE_LANCZOS)
+		
 		var thumb_path = state.SAVES_DIR + save_name + ".png"
-		var state_id = state.get_instance_id()
+		var thumb_err = img.save_png(thumb_path)
+		if thumb_err != OK:
+			print("WARNING: Failed to save thumbnail (", thumb_err, ")")
 		
-		# Use WorkerThreadPool for background saving to prevent freeze
-		WorkerThreadPool.add_task(func():
-			if img:
-				img.save_png(thumb_path)
-			var inner_state = instance_from_id(state_id)
-			if inner_state:
-				inner_state.save_game(save_name, data)
-			print("Threaded save complete: ", save_name)
-		)
+		if hud: hud.visible = true
+		if pause_layer: pause_layer.visible = true
+		if view_model: view_model.visible = player.current_camera_mode == player.CameraMode.FIRST_PERSON
+	
+	# Simple direct save
+	state.save_game(save_name, data)
+	print("Game save complete: ", save_name)
 
 
 func _setup_materials():
@@ -933,7 +950,9 @@ func _process(delta):
 		if current_p_chunk != last_player_chunk:
 			last_player_chunk = current_p_chunk
 			update_chunks(player_pos)
-			_unload_distant_chunks(player_pos) # Only unload when moving
+			# Only unload if we're done loading
+			if not is_loading:
+				_unload_distant_chunks(player_pos)
 		
 		# Process queue once per frame when playing to maintain high FPS
 		_process_generation_queue(player_pos)
@@ -1058,8 +1077,8 @@ func _process_generation_queue(_player_pos):
 	var current_data_gen_limit = data_gen_limit
 	
 	if is_loading:
-		current_gen_speed = 16 
-		current_data_gen_limit = 32 # Increased for faster loading
+		current_gen_speed = 32 # Much faster during loading
+		current_data_gen_limit = 64 # Generate all data concurrently
 	else:
 		current_gen_speed = 2 # Slightly faster in-game
 		current_data_gen_limit = 4
@@ -1073,7 +1092,7 @@ func _process_generation_queue(_player_pos):
 			active_data_tasks += 1
 			WorkerThreadPool.add_task(func(): 
 				var world = instance_from_id(self_id)
-				if is_instance_valid(world):
+				if is_instance_valid(world) and not world._world_being_freed:
 					world.generate_chunk_data(c_pos.x, c_pos.y)
 					world.call_deferred("_on_data_task_finished")
 			, false) # Low priority for background data gen
@@ -1138,14 +1157,40 @@ func _unload_distant_chunks(player_pos):
 		chunk_meshed_status.erase(c_pos)
 
 func generate_chunk_data(cx, cz):
+	# Early exit if world is being freed
+	if _world_being_freed:
+		return
+	
 	var c_pos = Vector2i(cx, cz)
 	var chunk_blocks = {}
 	var world_seed_hash = hash(world_seed)
+	
+	# Ensure noise is initialized
+	if noise == null:
+		noise = FastNoiseLite.new()
+		noise.seed = hash(world_seed)
+		noise.frequency = 0.005
+		noise.fractal_octaves = 5
+		noise.noise_type = FastNoiseLite.TYPE_PERLIN
+	
+	if biome_noise == null:
+		biome_noise = FastNoiseLite.new()
+		biome_noise.seed = hash(world_seed) + 1234
+		biome_noise.frequency = 0.003
+		biome_noise.noise_type = FastNoiseLite.TYPE_PERLIN
+	
+	# Another check after initialization
+	if _world_being_freed or noise == null or biome_noise == null:
+		return
 	
 	var tree_rng = RandomNumberGenerator.new()
 	
 	for x in range(chunk_size):
 		for z in range(chunk_size):
+			# Exit early if world is being freed during generation
+			if _world_being_freed:
+				return
+			
 			var world_x = cx * chunk_size + x
 			var world_z = cz * chunk_size + z
 			
@@ -1198,10 +1243,12 @@ func generate_chunk_data(cx, cz):
 									if not chunk_blocks.has(l_pos):
 										chunk_blocks[l_pos] = BlockType.LEAVES
 	
-	world_mutex.lock()
-	world_data[c_pos] = chunk_blocks
-	chunk_data_status[c_pos] = true
-	world_mutex.unlock()
+	# Final check before writing to shared data
+	if not _world_being_freed:
+		world_mutex.lock()
+		world_data[c_pos] = chunk_blocks
+		chunk_data_status[c_pos] = true
+		world_mutex.unlock()
 
 static func is_transparent(type):
 	return type == -1 or type == BlockType.WATER or type == BlockType.WATER_FLOW or type == BlockType.LEAVES or type == BlockType.TORCH
@@ -1229,20 +1276,28 @@ func create_chunk(cx, cz, high_priority = false):
 	if self_id == 0: return
 	
 	active_mesh_tasks[c_pos] = WorkerThreadPool.add_task(func(): 
-		var world = instance_from_id(self_id)
-		if is_instance_valid(world):
-			world._threaded_mesh_gen(cx, cz, current_chunk_size)
+		var world_inst = instance_from_id(self_id)
+		if is_instance_valid(world_inst):
+			world_inst._threaded_mesh_gen(cx, cz, current_chunk_size)
 	, high_priority)
 
 func _threaded_mesh_gen(cx, cz, c_size):
 	var c_pos = Vector2i(cx, cz)
 	var self_id = get_instance_id()
-	var world = instance_from_id(self_id)
 	var mesh_results = {} # type -> { "verts": [], ... }
+	
+	# Early exit if world was freed BEFORE anything else
+	if self_id == 0 or _world_being_freed:
+		return
 	
 	# Important: Snapshot the data inside the mutex
 	var relevant_chunks = {}
 	world_mutex.lock()
+	# Check if world still exists or is being freed before accessing data
+	if self_id == 0 or _world_being_freed:
+		world_mutex.unlock()
+		return
+	
 	for x in range(-1, 2):
 		for z in range(-1, 2):
 			var nc_pos = c_pos + Vector2i(x, z)
@@ -1252,14 +1307,27 @@ func _threaded_mesh_gen(cx, cz, c_size):
 	
 	var current_chunk_data = relevant_chunks.get(c_pos, {})
 	if current_chunk_data.is_empty():
-		if is_instance_valid(world):
-			world.call_deferred("_apply_chunk_mesh", cx, cz, [], [])
+		if not _world_being_freed:
+			var world_instance = instance_from_id(self_id)
+			if is_instance_valid(world_instance):
+				world_instance.call_deferred("_apply_chunk_mesh", cx, cz, [], [])
 		return
 	
 	var decoration_positions = [] # [{type: int, pos: Vector3}]
-
+	
+	# Make a local array copy to avoid threading issues
+	var pos_array = []
 	for pos in current_chunk_data:
-		var type = current_chunk_data[pos]
+		pos_array.append(pos)
+
+	for pos in pos_array:
+		# Exit early if world is being freed
+		if _world_being_freed:
+			return
+			
+		var type = current_chunk_data.get(pos, -1)
+		if type == -1:
+			continue
 		
 		# Skip decoration blocks from solid mesh
 		if type == BlockType.TORCH:
@@ -1343,26 +1411,35 @@ func _threaded_mesh_gen(cx, cz, c_size):
 			"arrays": arrays,
 			"col_shape": col_shape
 		})
-							
-	if is_instance_valid(world):
-		world.call_deferred("_apply_chunk_mesh", cx, cz, final_results, decoration_positions)
+	
+	# Final validity check before calling back
+	if self_id != 0:
+		var world_instance = instance_from_id(self_id)
+		if is_instance_valid(world_instance):
+			world_instance.call_deferred("_apply_chunk_mesh", cx, cz, final_results, decoration_positions)
 
 func _apply_chunk_mesh(cx, cz, final_results, decoration_positions = []):
 	var c_pos = Vector2i(cx, cz)
 	active_mesh_tasks.erase(c_pos)
 	chunk_meshed_status[c_pos] = true
 	
-	# Replace existing chunk if any
-	if chunks.has(c_pos):
-		chunks[c_pos].queue_free()
-	
 	# If no results and no decorations, just clean up
 	if final_results.is_empty() and decoration_positions.is_empty():
-		chunks.erase(c_pos)
+		if chunks.has(c_pos):
+			var old_chunk = chunks[c_pos]
+			if is_instance_valid(old_chunk):
+				old_chunk.queue_free()
+			chunks.erase(c_pos)
 		if chunks_needing_rebuild.has(c_pos):
 			chunks_needing_rebuild.erase(c_pos)
 			create_chunk(cx, cz)
 		return
+
+	# Replace existing chunk safely
+	if chunks.has(c_pos):
+		var old_chunk = chunks[c_pos]
+		if is_instance_valid(old_chunk):
+			old_chunk.queue_free()
 
 	var chunk_node = StaticBody3D.new()
 	chunk_node.name = "Chunk_%d_%d" % [cx, cz]
@@ -1390,70 +1467,45 @@ func _apply_chunk_mesh(cx, cz, final_results, decoration_positions = []):
 			col.shape = col_shape
 			chunk_node.add_child(col)
 	
-	# Handle Torches using MultiMesh for optimization
-	var torch_count = 0
+	# Handle Torches
 	for deco in decoration_positions:
-		if deco.type == BlockType.TORCH:
-			torch_count += 1
+		if deco.type == BlockType.TORCH and torch_mesh:
+			var mi = MeshInstance3D.new()
+			mi.mesh = torch_mesh
+			mi.material_override = torch_material
+			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			mi.layers = 8 # Layer 4
 			
-	if torch_count > 0 and torch_mesh:
-		var mm = MultiMesh.new()
-		mm.transform_format = MultiMesh.TRANSFORM_3D
-		mm.mesh = torch_mesh
-		mm.instance_count = torch_count
-		
-		var mmi = MultiMeshInstance3D.new()
-		mmi.multimesh = mm
-		mmi.material_override = torch_material
-		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		mmi.layers = 8 # Layer 4
-		chunk_node.add_child(mmi)
-		
-		# Create a separate body for torch collisions on Layer 3 (mask 4)
-		# This allows players to walk through torches (player mask is 1)
-		# while still allowing raycasts (mask 5) to hit them.
-		var deco_node = StaticBody3D.new()
-		deco_node.collision_layer = 4
-		deco_node.collision_mask = 0
-		chunk_node.add_child(deco_node)
-		
-		var idx = 0
-		for deco in decoration_positions:
-			if deco.type == BlockType.TORCH:
-				# deco.pos is in world coordinates
-				var local_pos = deco.pos - chunk_node.position + Vector3(0.5, 0, 0.5)
-				mm.set_instance_transform(idx, Transform3D(Basis(), local_pos))
-				
-				# Add dynamic light
-				var light = OmniLight3D.new()
-				light.add_to_group("torch_lights")
-				light.light_color = Color(1.0, 0.7, 0.3)
-				light.light_energy = 1.5
-				light.omni_range = 7.0
-				light.position = local_pos + Vector3(0, 0.5, 0)
-				
-				# Initialize shadow settings
-				var state = get_node_or_null("/root/GameState")
-				if state:
-					_apply_shadow_settings_to_light(light, state.shadow_quality)
-				else:
-					light.shadow_enabled = true
-					
-				light.light_cull_mask = 4294967295 - 8 # Ignore Torches (Layer 4) only
-				light.distance_fade_enabled = true
-				light.distance_fade_begin = 20.0
-				light.distance_fade_length = 5.0
-				chunk_node.add_child(light)
-				
-				# Add collision to the deco_node instead of the main chunk_node
-				var col = CollisionShape3D.new()
-				var box = BoxShape3D.new()
-				box.size = Vector3(0.5, 0.8, 0.5) # More accurate torch hit-box
-				col.shape = box
-				col.position = local_pos + Vector3(0, 0.4, 0)
-				deco_node.add_child(col)
-				
-				idx += 1
+			var local_pos = deco.pos - chunk_node.position + Vector3(0.5, 0, 0.5)
+			mi.position = local_pos
+			chunk_node.add_child(mi)
+			
+			# Create a separate body for torch collisions on Layer 3 (mask 4)
+			var deco_node = StaticBody3D.new()
+			deco_node.collision_layer = 4
+			deco_node.collision_mask = 0
+			chunk_node.add_child(deco_node)
+			
+			# Add dynamic light
+			var light = OmniLight3D.new()
+			light.add_to_group("torch_lights")
+			light.light_color = Color(1.0, 0.7, 0.3)
+			light.light_energy = 1.5
+			light.omni_range = 7.0
+			light.position = local_pos + Vector3(0, 0.5, 0)
+			light.shadow_enabled = false
+			light.light_cull_mask = 4294967295 - 8 # Ignore Torches (Layer 4) only
+			light.distance_fade_enabled = true
+			light.distance_fade_begin = 15.0
+			light.distance_fade_length = 5.0
+			chunk_node.add_child(light)
+			
+			var col = CollisionShape3D.new()
+			var box = BoxShape3D.new()
+			box.size = Vector3(0.5, 0.8, 0.5)
+			col.shape = box
+			col.position = local_pos + Vector3(0, 0.4, 0)
+			deco_node.add_child(col)
 	
 	# After applying, check if we need to rebuild because of a block change
 	if chunks_needing_rebuild.has(c_pos):

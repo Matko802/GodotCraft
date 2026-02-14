@@ -6,7 +6,11 @@ var frame_times = []
 const MAX_FRAMES = 1000
 
 func _ready():
-	visible = false
+	var state = get_node_or_null("/root/GameState")
+	if state:
+		visible = state.debug_menu_visible
+	else:
+		visible = false
 
 func _process(delta):
 	frame_times.append(delta)
@@ -82,3 +86,7 @@ func _calculate_lows():
 func _input(event):
 	if event is InputEventKey and event.pressed and event.keycode == KEY_F3:
 		visible = !visible
+		var state = get_node_or_null("/root/GameState")
+		if state:
+			state.debug_menu_visible = visible
+			state.save_settings()

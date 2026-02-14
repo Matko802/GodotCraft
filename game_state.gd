@@ -73,6 +73,9 @@ var is_slim = false:
 		is_slim = value
 		settings_changed.emit()
 
+var debug_menu_visible = false
+var last_camera_mode = 0 # 0: FP, 1: Back, 2: Front
+
 var custom_texture_path = ""
 
 enum GameMode { SURVIVAL, CREATIVE }
@@ -256,6 +259,8 @@ func save_settings():
 	config.set_value("Audio", "pickup_volume", pickup_volume)
 	config.set_value("Player", "is_slim", is_slim)
 	config.set_value("Player", "custom_texture_path", custom_texture_path)
+	config.set_value("Player", "last_camera_mode", last_camera_mode)
+	config.set_value("Debug", "debug_menu_visible", debug_menu_visible)
 	config.save(SETTINGS_PATH)
 
 func load_settings():
@@ -276,6 +281,8 @@ func load_settings():
 		pickup_volume = config.get_value("Audio", "pickup_volume", 1.0)
 		is_slim = config.get_value("Player", "is_slim", false)
 		custom_texture_path = config.get_value("Player", "custom_texture_path", "")
+		last_camera_mode = config.get_value("Player", "last_camera_mode", 0)
+		debug_menu_visible = config.get_value("Debug", "debug_menu_visible", false)
 	
 	_apply_graphics_settings()
 
@@ -365,21 +372,62 @@ func delete_save(save_name):
 		DirAccess.remove_absolute(thumb_path)
 
 func save_game(save_name, data):
+	# Simple, direct save - no threading complexity
+	if not save_name or save_name == "":
+		print("ERROR: Invalid save name")
+		return
+	
 	var path = SAVES_DIR + save_name + ".save"
+	
+	# Just open and write directly
 	var file = FileAccess.open(path, FileAccess.WRITE)
+	if not file:
+		print("ERROR: Cannot open file for writing: ", path)
+		return
+	
+	# Store minimal header
 	var header = {
 		"name": save_name,
 		"date": Time.get_datetime_string_from_system(false, true),
 		"seed": data.get("seed", "")
 	}
-	file.store_var(header) # Store header first
-	file.store_var(data)   # Store full data second
-	file.flush()
+	
+	file.store_var(header)
+	if file.get_error() != OK:
+		print("WARNING: Header write error, continuing...")
+	
+	file.store_var(data)
+	if file.get_error() != OK:
+		print("WARNING: Data write error")
+	
+	print("Save attempt: ", save_name)
 
 func load_game_data(save_name):
+	if not save_name or save_name == "":
+		print("ERROR: Invalid save name")
+		return null
+	
 	var path = SAVES_DIR + save_name + ".save"
-	if FileAccess.file_exists(path):
-		var file = FileAccess.open(path, FileAccess.READ)
-		file.get_var() # Skip header
-		return file.get_var() # Return actual data
-	return null
+	
+	if not FileAccess.file_exists(path):
+		print("ERROR: Save file not found: ", path)
+		return null
+	
+	var file = FileAccess.open(path, FileAccess.READ)
+	if not file:
+		print("ERROR: Cannot open save file: ", path)
+		return null
+	
+	# Try to read header
+	var header = file.get_var()
+	if file.get_error() != OK or header == null:
+		print("ERROR: Failed to read header from save")
+		return null
+	
+	# Try to read data
+	var data = file.get_var()
+	if file.get_error() != OK or data == null:
+		print("ERROR: Failed to read data from save")
+		return null
+	
+	return data

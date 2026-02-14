@@ -22,10 +22,22 @@ extends Control
 @onready var slim_checkbox = find_child("SlimModelCheckBoxUI", true) as CheckBox
 @onready var browse_texture_button = find_child("BrowseTextureButtonUI", true) as Button
 @onready var username_input = find_child("UsernameInputUI", true) as LineEdit
+@onready var leaving_overlay = $LeavingOverlay
 
 func _ready():
 	visible = false
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	
+	if leaving_overlay:
+		leaving_overlay.visible = false
+		leaving_overlay.color = Color(0, 0, 0, 0.8)
+		leaving_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+		
+		var leaving_label = leaving_overlay.get_node("CenterContainer/Label")
+		if leaving_label:
+			leaving_label.text = "Leaving World..."
+			leaving_label.add_theme_font_size_override("font_size", 32)
+	
 	$CenterContainer/MenuPanel/MenuMargin/VBoxContainer/MainContent/ResumeButton.pressed.connect(_on_resume_pressed)
 	$CenterContainer/MenuPanel/MenuMargin/VBoxContainer/MainContent/SettingsButton.pressed.connect(_on_settings_pressed)
 	$CenterContainer/MenuPanel/MenuMargin/VBoxContainer/MainContent/QuitButton.pressed.connect(_on_quit_pressed)
@@ -286,7 +298,16 @@ func _on_resume_pressed():
 	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 
 func _on_quit_pressed():
+	leaving_overlay.visible = true
 	get_tree().paused = false
+	
+	# Save the game (don't wait, just start it)
+	var world = get_node_or_null("/root/World")
+	if world and world.has_method("save_game"):
+		world.save_game(true)  # Save data only (no screenshot) for speed
+	
+	# Change scene immediately - let save happen in background
+	await get_tree().process_frame
 	get_tree().change_scene_to_file("res://main_menu.tscn")
 
 func _on_settings_pressed():
@@ -327,7 +348,11 @@ func _on_fov_changed(value):
 	if state:
 		state.fov = float(value)
 		state.save_settings()
-		state.settings_changed.emit()
+		
+		# Apply FOV immediately to camera (even while paused)
+		var player = get_tree().get_first_node_in_group("player")
+		if player and player.has_node("SpringArm3D/Camera3D"):
+			player.get_node("SpringArm3D/Camera3D").fov = float(value)
 
 func _on_fullscreen_toggled(toggled_on):
 	var state = get_node_or_null("/root/GameState")
